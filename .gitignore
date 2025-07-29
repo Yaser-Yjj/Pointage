@@ -1,0 +1,55 @@
+# Android Studio specific
+*.iml
+.idea/
+.gradle/
+local.properties
+
+# Build outputs
+/build/
+*/build/
+.cxx/
+.externalNativeBuild/
+
+# Mac OS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Others
+captures/
+*.log
+*.keystore
+*.jks
+
+# Kotlin specific
+*.kotlin_module
+
+# Jetpack Compose Preview cache
+.idea/assetWizardSettings.xml
+.idea/navEditor.xml
+.idea/workspace.xml
+.idea/caches
+.idea/libraries
+.idea/modules.xml
+
+# Crashlytics / Firebase
+fabric.properties
+crashlytics.properties
+
+# Android NDK
+.ndk/
+
+# Generated files
+generated/
+
+# Ignore test results
+test-results/
+outputs/
+
+# Misc
+*.apk
+*.ap_
+
+# VSCode (if used)
+.vscode/
