@@ -53,14 +53,12 @@ class MainActivity : AppCompatActivity() {
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        // Continue regardless of notification permission
         checkLocationPermissions()
     }
 
     private val locationSettingsLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        // Check if location is now enabled
         if (isLocationEnabled()) {
             onAllPermissionsGranted()
         } else {
@@ -88,7 +86,20 @@ class MainActivity : AppCompatActivity() {
             openAppSettings()
         }
 
+        binding.btnTestCoordinates.setOnClickListener {
+            showGeofenceInfoDialog()
+        }
+
         updateUI()
+    }
+
+    private fun showGeofenceInfoDialog() {
+        val info = geofenceManager.getCurrentGeofenceInfo()
+        AlertDialog.Builder(this)
+            .setTitle("🎯 Geofence Information")
+            .setMessage("$info\n\n📱 Check Logcat for detailed logs\n🔍 Filter by 'GeofenceManager' or 'GeofenceBroadcastReceiver'")
+            .setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
+            .show()
     }
 
     private fun requestNotificationPermission() {
@@ -173,7 +184,7 @@ class MainActivity : AppCompatActivity() {
     private fun showLocationPermissionDialog(onPositive: () -> Unit) {
         AlertDialog.Builder(this)
             .setTitle("Location Permission Required")
-            .setMessage("This app needs location access to track when you enter or exit the designated area. This helps monitor your presence in the zone.")
+            .setMessage("This app needs location access to track when you enter or exit the designated area.")
             .setPositiveButton("Grant Permission") { _, _ -> onPositive() }
             .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
             .setCancelable(false)
@@ -231,26 +242,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onAllPermissionsGranted() {
-        Toast.makeText(this, "Starting location tracking...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "🎯 Starting geofence tracking at your current location!", Toast.LENGTH_LONG).show()
         startLocationTracking()
         updateUI()
     }
 
     private fun startLocationTracking() {
-        // Start the background service
         val serviceIntent = Intent(this, BackgroundLocationService::class.java)
         ContextCompat.startForegroundService(this, serviceIntent)
-
-        // Setup geofences (will be handled by the service)
-        // geofenceManager.setupGeofences() - This is now called from the service
     }
 
     private fun stopLocationTracking() {
-        // Stop the background service
         val serviceIntent = Intent(this, BackgroundLocationService::class.java)
         stopService(serviceIntent)
 
-        // Remove geofences
         geofenceManager.removeGeofences()
 
         Toast.makeText(this, "Location tracking stopped", Toast.LENGTH_SHORT).show()
@@ -261,10 +266,11 @@ class MainActivity : AppCompatActivity() {
         val isServiceRunning = BackgroundLocationService.isServiceRunning
         binding.btnStartTracking.isEnabled = !isServiceRunning
         binding.btnStopTracking.isEnabled = isServiceRunning
+        binding.btnTestCoordinates.isEnabled = true
         binding.tvStatus.text = if (isServiceRunning) {
-            "Location tracking is active"
+            "🟢 Geofence tracking is ACTIVE\n\n📍 Geofence set at your current location\n📏 Radius: 20 meters\n\n🚶‍♂️ Walk 25+ meters away to test EXIT\n🏃‍♂️ Walk back to test ENTER\n\n📱 Watch Logcat for detailed logs!"
         } else {
-            "Location tracking is stopped"
+            "🔴 Geofence tracking is STOPPED\n\nTap 'Start Tracking' to begin"
         }
     }
 

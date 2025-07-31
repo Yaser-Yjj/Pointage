@@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import com.lykos.pointage.GeofenceApplication
 import com.lykos.pointage.MainActivity
 import com.lykos.pointage.database.LocationEvent
+import com.lykos.pointage.receiver.GeofenceBroadcastReceiver
 import com.lykos.pointage.utils.GeofenceManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -48,16 +49,31 @@ class BackgroundLocationService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        Log.d(TAG, "Service onStartCommand")
+        Log.d(TAG, "Service onStartCommand with action: ${intent?.action}")
+
+        // Handle geofence events
+        when (intent?.action) {
+            GeofenceBroadcastReceiver.ACTION_GEOFENCE_EXIT -> {
+                Log.d(TAG, "🔴 Service received GEOFENCE EXIT")
+                handleGeofenceExit()
+                return START_STICKY
+            }
+            GeofenceBroadcastReceiver.ACTION_GEOFENCE_ENTER -> {
+                Log.d(TAG, "🟢 Service received GEOFENCE ENTER")
+                handleGeofenceEntry()
+                return START_STICKY
+            }
+        }
 
         try {
             val notification = createNotification()
             startForeground(NOTIFICATION_ID, notification)
 
-            // Setup geofences with a delay to ensure service is fully started
+            // Setup geofences with current location
             lifecycleScope.launch {
-                delay(1000) // Wait 1 second
-                geofenceManager.setupGeofences()
+                delay(2000) // Wait 2 seconds for service to fully start
+                Log.d(TAG, "Setting up geofences with current location...")
+                geofenceManager.setupGeofencesWithCurrentLocation()
             }
 
         } catch (e: Exception) {
@@ -112,7 +128,7 @@ class BackgroundLocationService : LifecycleService() {
 
         return NotificationCompat.Builder(this, GeofenceApplication.FOREGROUND_SERVICE_CHANNEL_ID)
             .setContentTitle("Location Tracking Active")
-            .setContentText("Monitoring geofence area")
+            .setContentText("Monitoring geofence area - Waiting for location...")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -124,7 +140,7 @@ class BackgroundLocationService : LifecycleService() {
     }
 
     fun handleGeofenceExit() {
-        Log.d(TAG, "Handling geofence exit")
+        Log.d(TAG, "🔴 TIMER STARTED - You are OUTSIDE the fence")
         exitTimestamp = System.currentTimeMillis()
 
         lifecycleScope.launch {
@@ -143,15 +159,21 @@ class BackgroundLocationService : LifecycleService() {
 
         // Show notification that user is away
         geofenceManager.showAwayNotification()
+
+        // Update foreground notification
+        updateForegroundNotification("🔴 OUTSIDE - Timer ON")
     }
 
     fun handleGeofenceEntry() {
-        Log.d(TAG, "Handling geofence entry")
+        Log.d(TAG, "🟢 TIMER STOPPED - You are INSIDE the fence")
         val entryTime = System.currentTimeMillis()
         val exitTime = exitTimestamp
 
         if (exitTime != null) {
             val timeAway = entryTime - exitTime
+            val timeAwayMinutes = timeAway / (1000 * 60)
+
+            Log.d(TAG, "Time away: ${timeAwayMinutes} minutes")
 
             lifecycleScope.launch {
                 try {
@@ -163,7 +185,7 @@ class BackgroundLocationService : LifecycleService() {
                             totalTimeAway = timeAway
                         )
                         database.locationEventDao().updateLocationEvent(updatedEvent)
-                        Log.d(TAG, "Entry event updated in database. Time away: ${timeAway}ms")
+                        Log.d(TAG, "Entry event updated in database. Time away: ${timeAwayMinutes} minutes")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error updating entry event", e)
@@ -175,5 +197,36 @@ class BackgroundLocationService : LifecycleService() {
 
         // Cancel the away notification
         geofenceManager.cancelAwayNotification()
+
+        // Update foreground notification
+        updateForegroundNotification("🟢 INSIDE - Timer OFF")
+    }
+
+    private fun updateForegroundNotification(status: String) {
+        val notificationIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            notificationIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(this, GeofenceApplication.FOREGROUND_SERVICE_CHANNEL_ID)
+            .setContentTitle("Location Tracking Active")
+            .setContentText(status)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
+        notificationManager.notify(NOTIFICATION_ID, notification)
+        Log.d(TAG, "Foreground notification updated: $status")
     }
 }
