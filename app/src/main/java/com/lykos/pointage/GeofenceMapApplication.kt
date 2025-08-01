@@ -29,7 +29,6 @@ class GeofenceMapApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Application onCreate")
         createNotificationChannels()
     }
 

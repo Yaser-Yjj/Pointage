@@ -67,6 +67,23 @@ dependencies {
     // Gson for JSON serialization
     implementation(libs.gson)
 
+    // Retrofit for networking
+    implementation (libs.retrofit)
+    implementation (libs.converter.gson)
+    implementation (libs.logging.interceptor)
+
+    // Glide for image loading
+    implementation (libs.glide)
+    annotationProcessor (libs.compiler)
+
+    // Kotlin Coroutines
+    implementation (libs.kotlinx.coroutines.core)
+
+    // RecyclerView
+    implementation (libs.androidx.recyclerview)
+    // CardView
+    implementation (libs.androidx.cardview)
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)

@@ -15,12 +15,3 @@ data class GeofenceData(
     val isActive: Boolean = false
 ) : Parcelable
 
-/**
- * Data class for geofence preferences storage
- */
-data class GeofencePreferences(
-    val latitude: Double = 0.0,
-    val longitude: Double = 0.0,
-    val radius: Float = 100f,
-    val isGeofenceActive: Boolean = false
-)

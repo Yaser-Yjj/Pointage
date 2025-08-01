@@ -4,18 +4,23 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.CalendarContract
 import android.provider.Settings
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.FrameLayout
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.ColorRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -27,6 +32,8 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.button.MaterialButton
 import com.lykos.pointage.R
 import com.lykos.pointage.databinding.ActivityMainBinding
 import com.lykos.pointage.service.LocationTrackingService
@@ -76,6 +83,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
+    private lateinit var bottomSheetBehavior: BottomSheetBehavior<FrameLayout>
+
+
     /**
      * Requests background location permission (Android 10+)
      */
@@ -95,7 +105,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         if (granted) {
             checkLocationPermissions()
         } else {
-            Toast.makeText(this, "Notification permission recommended for alerts", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this, "Notification permission recommended for alerts", Toast.LENGTH_LONG
+            ).show()
             checkLocationPermissions()
         }
     }
@@ -119,7 +131,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         // Request notification permission first (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(
+                    this, Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             } else {
                 checkLocationPermissions()
@@ -127,7 +142,69 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         } else {
             checkLocationPermissions()
         }
+
+        setupButtonSheet()
+        navigateToReportPage()
     }
+
+    private fun navigateToReportPage(){
+        binding.btnAddReport.setOnClickListener {
+            val intent = Intent(this, ReportActivity::class.java)
+            startActivity(intent)
+        }
+    }
+
+    private fun setMapGesturesEnabled(enabled: Boolean) {
+        googleMap.uiSettings.isScrollGesturesEnabled = enabled
+        googleMap.uiSettings.isZoomGesturesEnabled = enabled
+        googleMap.uiSettings.isRotateGesturesEnabled = enabled
+        googleMap.uiSettings.isTiltGesturesEnabled = enabled
+    }
+
+    private fun setupButtonSheet() {
+        val bottomSheet = findViewById<FrameLayout>(R.id.bottomSheet)
+        bottomSheetBehavior = BottomSheetBehavior.from(bottomSheet)
+        bottomSheetBehavior.peekHeight = 250
+        bottomSheetBehavior.isHideable = false
+        bottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
+
+        bottomSheetBehavior.addBottomSheetCallback(object :
+            BottomSheetBehavior.BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                if (!::googleMap.isInitialized) return
+
+                when (newState) {
+                    BottomSheetBehavior.STATE_EXPANDED -> {
+                        setMapGesturesEnabled(false)
+                        binding.tvStatus.text = "Adjust your settings or start tracking"
+                    }
+
+                    BottomSheetBehavior.STATE_COLLAPSED -> {
+                        setMapGesturesEnabled(true)
+                        updateButtonStates()
+                    }
+
+                    BottomSheetBehavior.STATE_HALF_EXPANDED -> {
+                        setMapGesturesEnabled(false)
+                        binding.tvStatus.text = "Half expanded - Adjust radius or settings"
+                    }
+
+                    BottomSheetBehavior.STATE_HIDDEN -> {
+                        setMapGesturesEnabled(true)
+                        binding.tvStatus.text = "Tap on map to select safe zone center"
+                    }
+
+                    else -> {}
+                }
+            }
+
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {
+                val dimAmount = 0.5f * slideOffset.coerceIn(0f, 1f)
+                binding.map.alpha = 1f - dimAmount
+            }
+        })
+    }
+
 
     private fun setupToolbar() {
         setSupportActionBar(binding.toolbar)
@@ -149,7 +226,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     geofenceRadius = MIN_RADIUS + progress
-                    binding.tvRadiusValue.text = "$geofenceRadius.toInt()}m"
+                    binding.tvRadiusValue.text = "${geofenceRadius.toInt()}m"
                     updateGeofenceCircle()
                 }
             }
@@ -194,13 +271,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         googleMap.uiSettings.isMyLocationButtonEnabled = false
 
         googleMap.setOnMapClickListener { latLng ->
-            selectLocation(latLng)
+            if (viewModel.isTracking.value == true) {
+                Toast.makeText(this, "Stop tracking to change location", Toast.LENGTH_SHORT).show()
+            } else {
+                selectLocation(latLng)
+            }
         }
 
-        // Now it's safe to enable my-location layer
         enableMyLocationIfPermitted()
 
-        // Load existing geofence or move to current location
         viewModel.geofenceData.value?.let { geofenceData ->
             val location = LatLng(geofenceData.latitude, geofenceData.longitude)
             showGeofenceOnMap(location, geofenceData.radius)
@@ -211,11 +290,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun selectLocation(latLng: LatLng) {
-        Log.d(TAG, "Location selected: ${latLng.latitude}, ${latLng.longitude}")
         selectedLocation = latLng
         showGeofenceOnMap(latLng, geofenceRadius)
         updateButtonStates()
-        Toast.makeText(this, "Location selected! Adjust radius and confirm.", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Location selected! Adjust radius and confirm.", Toast.LENGTH_SHORT)
+            .show()
+
+        if (::bottomSheetBehavior.isInitialized) {
+            bottomSheetBehavior.state = BottomSheetBehavior.STATE_EXPANDED
+        }
     }
 
     private fun showGeofenceOnMap(location: LatLng, radius: Float) {
@@ -223,18 +306,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         googleMap.clear()
 
         googleMap.addMarker(
-            MarkerOptions()
-                .position(location)
-                .title("Safe Zone Center")
+            MarkerOptions().position(location).title("Safe Zone Center")
         )
 
         geofenceCircle = googleMap.addCircle(
-            CircleOptions()
-                .center(location)
-                .radius(radius.toDouble())
+            CircleOptions().center(location).radius(radius.toDouble())
                 .strokeColor(ContextCompat.getColor(this, R.color.geofence_stroke))
-                .fillColor(ContextCompat.getColor(this, R.color.geofence_fill))
-                .strokeWidth(3f)
+                .fillColor(ContextCompat.getColor(this, R.color.geofence_fill)).strokeWidth(3f)
         )
 
         googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, DEFAULT_ZOOM))
@@ -249,12 +327,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun confirmGeofenceLocation() {
         val location = selectedLocation
         if (location == null) {
-            Toast.makeText(this, "Please select a location on the map first", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Please select a location on the map first", Toast.LENGTH_SHORT)
+                .show()
             return
         }
         viewModel.saveGeofenceData(location.latitude, location.longitude, geofenceRadius)
         Toast.makeText(this, "Safe zone location confirmed!", Toast.LENGTH_SHORT).show()
-        updateButtonStates()
+        binding.btnConfirmLocation.isEnabled = false
+        setOutlinedButtonColors(
+            binding.btnConfirmLocation,
+            R.color.geofence_stroke,
+            R.color.geofence_stroke,
+            R.color.geofence_stroke
+        )
+        binding.btnConfirmLocation.text = "Confirmed"
     }
 
     private fun startGeofenceTracking() {
@@ -269,7 +355,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             longitude = geofenceData.longitude,
             radius = geofenceData.radius,
             onSuccess = {
-                Log.d(TAG, "✅ Geofence registered successfully")
                 viewModel.updateGeofenceActiveState(true)
                 viewModel.updateTrackingState(true)
 
@@ -282,16 +367,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 updateButtonStates()
             },
             onFailure = { error ->
-                Log.e(TAG, "❌ Failed to register geofence: $error")
                 Toast.makeText(this, "Failed to start tracking: $error", Toast.LENGTH_LONG).show()
-            }
-        )
+            })
     }
 
     private fun stopGeofenceTracking() {
         geofenceManager.removeGeofences { success ->
-            if (success) Log.d(TAG, "✅ Geofence removed successfully")
-            else Log.e(TAG, "❌ Failed to remove geofence")
+            if (!success) {
+                Toast.makeText(this, "Failed to stop geofence", Toast.LENGTH_SHORT).show()
+            }
         }
 
         val serviceIntent = Intent(this, LocationTrackingService::class.java).apply {
@@ -306,7 +390,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun moveToCurrentLocation() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             return
         }
 
@@ -314,7 +401,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             if (location != null) {
                 val currentLatLng = LatLng(location.latitude, location.longitude)
                 googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, DEFAULT_ZOOM))
-                Toast.makeText(this, "Tap on map to select safe zone center", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Tap on map to select safe zone center", Toast.LENGTH_LONG)
+                    .show()
             } else {
                 Toast.makeText(this, "Unable to get current location", Toast.LENGTH_SHORT).show()
             }
@@ -328,8 +416,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
      */
     private fun enableMyLocationIfPermitted() {
         if (::googleMap.isInitialized && ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
+                this, Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
             googleMap.isMyLocationEnabled = true
@@ -341,24 +428,138 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         val hasConfirmedLocation = viewModel.geofenceData.value != null
         val isTracking = viewModel.isTracking.value == true
 
-        binding.btnConfirmLocation.isEnabled = hasSelectedLocation && !isTracking
-        binding.btnStartTracking.isEnabled = hasConfirmedLocation && !isTracking
-        binding.btnStopTracking.isEnabled = isTracking
-        binding.seekBarRadius.isEnabled = !isTracking
+        // --- Confirm Location Button ---
+        when {
+            isTracking -> {
+                binding.btnConfirmLocation.isEnabled = false
+                setOutlinedButtonColors(
+                    binding.btnConfirmLocation,
+                    R.color.gris,
+                    R.color.gris,
+                    R.color.gris
+                )
+                binding.btnConfirmLocation.text = "Location Locked"
+            }
 
-        binding.tvStatus.text = when {
-            isTracking -> "🟢 Safe zone tracking is ACTIVE"
-            hasConfirmedLocation -> "✅ Safe zone configured - Ready to start tracking"
-            hasSelectedLocation -> "📍 Location selected - Confirm to save"
-            else -> "📍 Tap on map to select safe zone center"
+            hasSelectedLocation -> {
+                binding.btnConfirmLocation.isEnabled = true
+                setOutlinedButtonColors(
+                    binding.btnConfirmLocation,
+                    R.color.geofence_stroke,
+                    R.color.geofence_stroke,
+                    R.color.geofence_stroke
+                )
+                binding.btnConfirmLocation.text = "Confirm Location"
+            }
+
+            hasConfirmedLocation -> {
+                binding.btnConfirmLocation.isEnabled = true
+                setOutlinedButtonColors(
+                    binding.btnConfirmLocation,
+                    R.color.geofence_stroke,
+                    R.color.geofence_stroke,
+                    R.color.geofence_stroke
+                )
+                binding.btnConfirmLocation.text = "Confirmed"
+            }
+
+            else -> {
+                binding.btnConfirmLocation.isEnabled = false
+                setOutlinedButtonColors(
+                    binding.btnConfirmLocation,
+                    R.color.gris,
+                    R.color.gris,
+                    R.color.gris
+                )
+                binding.btnConfirmLocation.text = "Select Location First"
+            }
         }
+
+
+        // --- Start Tracking Button ---
+        if (isTracking) {
+            binding.btnStartTracking.isEnabled = false
+            binding.btnStartTracking.backgroundTintList =
+                ContextCompat.getColorStateList(this, R.color.rouge)
+            binding.btnStartTracking.strokeColor =
+                ContextCompat.getColorStateList(this, R.color.rouge)
+            binding.btnStartTracking.setTextColor(ContextCompat.getColor(this, R.color.blanc))
+            binding.btnStartTracking.text = "Tracking..."
+        } else if (hasConfirmedLocation) {
+            binding.btnStartTracking.isEnabled = true
+            binding.btnStartTracking.backgroundTintList =
+                ContextCompat.getColorStateList(this, R.color.geofence_stroke)
+            binding.btnStartTracking.strokeColor =
+                ContextCompat.getColorStateList(this, R.color.geofence_stroke)
+            binding.btnStartTracking.setTextColor(ContextCompat.getColor(this, R.color.blanc))
+            binding.btnStartTracking.text = "Start Tracking"
+        } else {
+            binding.btnStartTracking.isEnabled = false
+            binding.btnStartTracking.backgroundTintList =
+                ContextCompat.getColorStateList(this, R.color.gris)
+            binding.btnStartTracking.strokeColor =
+                ContextCompat.getColorStateList(this, R.color.gris)
+            binding.btnStartTracking.setTextColor(ContextCompat.getColor(this, R.color.blanc))
+            binding.btnStartTracking.text = "Confirm First"
+        }
+
+        // --- Stop Tracking Button ---
+        binding.btnStopTracking.isEnabled = isTracking
+        if (isTracking) {
+            setOutlinedButtonColors(
+                binding.btnStopTracking,
+                R.color.rouge,
+                R.color.rouge,
+                R.color.rouge
+            )
+            binding.btnStopTracking.text = "Stop Tracking"
+        } else {
+            setOutlinedButtonColors(
+                binding.btnStopTracking,
+                R.color.gris,
+                R.color.gris,
+                R.color.gris
+            )
+            binding.btnStopTracking.text = "Not Tracking"
+        }
+
+        // --- Map Gestures ---
+        if (::googleMap.isInitialized) {
+            googleMap.uiSettings.isScrollGesturesEnabled = !isTracking
+            googleMap.uiSettings.isZoomGesturesEnabled = !isTracking
+            googleMap.uiSettings.isRotateGesturesEnabled = !isTracking
+            googleMap.uiSettings.isTiltGesturesEnabled = !isTracking
+        }
+
+        // --- Status Text ---
+        binding.tvStatus.text = when {
+            isTracking -> "Safe zone tracking is ACTIVE"
+            hasConfirmedLocation -> "Safe zone configured - Ready to start tracking"
+            hasSelectedLocation -> "Location selected - Confirm to save"
+            else -> "Tap on map to select safe zone center"
+        }
+    }
+
+    private fun setOutlinedButtonColors(
+        button: MaterialButton,
+        @ColorRes strokeColor: Int,
+        @ColorRes textColor: Int,
+        @ColorRes rippleColor: Int
+    ) {
+        button.strokeColor = ContextCompat.getColorStateList(this, strokeColor)
+        button.setTextColor(ContextCompat.getColorStateList(this, textColor))
+        button.rippleColor = ContextCompat.getColorStateList(this, rippleColor)
     }
 
     // --- Permission Handling ---
 
     private fun checkLocationPermissions() {
-        val fineLocationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarseLocationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val fineLocationGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseLocationGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
         if (fineLocationGranted && coarseLocationGranted) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -374,8 +575,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun checkBackgroundLocationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val backgroundGranted = ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                this, Manifest.permission.ACCESS_BACKGROUND_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
             if (backgroundGranted) {
                 checkLocationSettings()
@@ -420,59 +620,52 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun isLocationEnabled(): Boolean {
-        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
-                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(
+            LocationManager.NETWORK_PROVIDER
+        )
     }
 
     private fun onAllPermissionsGranted() {
         // This is safe now because map is already ready
         enableMyLocationIfPermitted()
-        Toast.makeText(this, "✅ All permissions granted! You can now set up geofencing.", Toast.LENGTH_LONG).show()
+        Toast.makeText(
+            this, "✅ All permissions granted! You can now set up geofencing.", Toast.LENGTH_LONG
+        ).show()
     }
 
     // --- Dialogs ---
 
     private fun showLocationPermissionDialog(onPositive: () -> Unit) {
-        AlertDialog.Builder(this)
-            .setTitle("Location Permission Required")
+        AlertDialog.Builder(this).setTitle("Location Permission Required")
             .setMessage("This app needs location access to create and monitor your safe zone. Location data is only used for geofencing and is not shared.")
             .setPositiveButton("Grant Permission") { _, _ -> onPositive() }
-            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-            .setCancelable(false)
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }.setCancelable(false)
             .show()
     }
 
     private fun showBackgroundLocationDialog(onPositive: (() -> Unit)? = null) {
-        AlertDialog.Builder(this)
-            .setTitle("Background Location Required")
+        AlertDialog.Builder(this).setTitle("Background Location Required")
             .setMessage("To track when you leave and return to your safe zone, this app needs background location access. Please select 'Allow all the time' in the next screen.")
             .setPositiveButton("Continue") { _, _ ->
                 onPositive?.invoke() ?: openAppSettings()
-            }
-            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-            .setCancelable(false)
+            }.setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }.setCancelable(false)
             .show()
     }
 
     private fun showLocationSettingsDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Location Services Disabled")
+        AlertDialog.Builder(this).setTitle("Location Services Disabled")
             .setMessage("Please enable location services (GPS) for accurate geofencing. High accuracy mode is recommended.")
             .setPositiveButton("Open Settings") { _, _ ->
                 startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-            }
-            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-            .setCancelable(false)
+            }.setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }.setCancelable(false)
             .show()
     }
 
     private fun showPermissionDeniedDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Permission Required")
+        AlertDialog.Builder(this).setTitle("Permission Required")
             .setMessage("Location permission is required for this app to work. Please grant the permission in app settings.")
             .setPositiveButton("Open Settings") { _, _ -> openAppSettings() }
-            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-            .show()
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }.show()
     }
 
     private fun openAppSettings() {
@@ -495,10 +688,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 showHistoryDialog()
                 true
             }
+
             R.id.action_clear_data -> {
                 showClearDataDialog()
                 true
             }
+
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -523,17 +718,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 historyText.append("Enter: $enterTime\n")
                 historyText.append("Duration: $duration\n\n")
             }
-            AlertDialog.Builder(this)
-                .setTitle("Location History")
+            AlertDialog.Builder(this).setTitle("Location History")
                 .setMessage(historyText.toString())
-                .setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
-                .show()
+                .setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }.show()
         }
     }
 
     private fun showClearDataDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Clear All Data")
+        AlertDialog.Builder(this).setTitle("Clear All Data")
             .setMessage("This will delete all location events and reset the app. Are you sure?")
             .setPositiveButton("Clear") { _, _ ->
                 viewModel.clearAllData()
@@ -542,9 +734,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 selectedLocation = null
                 updateButtonStates()
                 Toast.makeText(this, "All data cleared", Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-            .show()
+            }.setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }.show()
     }
 
     override fun onResume() {

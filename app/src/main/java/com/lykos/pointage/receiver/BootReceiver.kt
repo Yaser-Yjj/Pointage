@@ -22,7 +22,6 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d(TAG, "Boot receiver triggered: ${intent.action}")
 
         when (intent.action) {
             Intent.ACTION_BOOT_COMPLETED,
@@ -48,8 +47,6 @@ class BootReceiver : BroadcastReceiver() {
                 geofencePrefs.latitude != 0.0 &&
                 geofencePrefs.longitude != 0.0) {
 
-                Log.d(TAG, "Restoring geofence at: ${geofencePrefs.latitude}, ${geofencePrefs.longitude}")
-
                 // Re-register geofence
                 val geofenceManager = GeofenceManager(context)
                 geofenceManager.createGeofence(
@@ -57,15 +54,11 @@ class BootReceiver : BroadcastReceiver() {
                     longitude = geofencePrefs.longitude,
                     radius = geofencePrefs.radius,
                     onSuccess = {
-                        Log.d(TAG, "✅ Geofence restored successfully after boot")
-
-                        // Restart tracking service if it was running
                         if (preferencesManager.isTracking()) {
                             val serviceIntent = Intent(context, LocationTrackingService::class.java).apply {
                                 action = LocationTrackingService.ACTION_START_TRACKING
                             }
                             ContextCompat.startForegroundService(context, serviceIntent)
-                            Log.d(TAG, "✅ Tracking service restarted after boot")
                         }
                     },
                     onFailure = { error ->

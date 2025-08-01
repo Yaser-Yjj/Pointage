@@ -4,4 +4,10 @@
     <color name="white">#FFFFFFFF</color>
     <color name="geofence_stroke">#FF2196F3</color>
     <color name="geofence_fill">#332196F3</color>
+    <color name="vert">#4CAF50</color>
+    <color name="orange">#FF9800</color>
+    <color name="rouge">#F44336</color>
+    <color name="gris">#9E9E9E</color>
+    <color name="bleu">#2196F3</color>
+    <color name="blanc">#FFFFFF</color>
 </resources>

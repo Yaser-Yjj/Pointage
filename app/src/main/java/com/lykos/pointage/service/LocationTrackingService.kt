@@ -50,9 +50,8 @@ class LocationTrackingService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Service onCreate")
 
-        notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         preferencesManager = PreferencesManager(this)
         isServiceRunning = true
     }
@@ -61,7 +60,6 @@ class LocationTrackingService : LifecycleService() {
         super.onStartCommand(intent, flags, startId)
 
         val action = intent?.action
-        Log.d(TAG, "Service onStartCommand with action: $action")
 
         when (action) {
             ACTION_START_TRACKING -> {
@@ -87,7 +85,6 @@ class LocationTrackingService : LifecycleService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "Service onDestroy")
         isServiceRunning = false
         isUserAway = false
         preferencesManager.setTrackingState(false)
@@ -102,7 +99,6 @@ class LocationTrackingService : LifecycleService() {
      * Starts foreground service with persistent notification
      */
     private fun startForegroundTracking() {
-        Log.d(TAG, "Starting foreground tracking")
 
         val notification = createServiceNotification("Monitoring safe zone", false)
         startForeground(NOTIFICATION_ID, notification)
@@ -114,7 +110,6 @@ class LocationTrackingService : LifecycleService() {
      * Stops tracking and removes service
      */
     private fun stopTracking() {
-        Log.d(TAG, "Stopping tracking service")
 
         // If user was away, handle the return
         if (isUserAway) {
@@ -149,7 +144,6 @@ class LocationTrackingService : LifecycleService() {
                     geofenceRadius = geofencePrefs.radius
                 )
                 database.locationEventDao().insertLocationEvent(locationEvent)
-                Log.d(TAG, "Exit event saved to database")
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving exit event", e)
             }
@@ -174,7 +168,7 @@ class LocationTrackingService : LifecycleService() {
             val timeAway = enterTime - exitTime
             val timeAwayMinutes = timeAway / (1000 * 60)
 
-            Log.d(TAG, "Time away: ${timeAwayMinutes} minutes")
+            Log.d(TAG, "Time away: $timeAwayMinutes minutes")
 
             // Update database with enter time and duration
             lifecycleScope.launch {
@@ -186,7 +180,6 @@ class LocationTrackingService : LifecycleService() {
                             totalTimeAway = timeAway
                         )
                         database.locationEventDao().updateLocationEvent(updatedEvent)
-                        Log.d(TAG, "Enter event updated in database")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error updating enter event", e)

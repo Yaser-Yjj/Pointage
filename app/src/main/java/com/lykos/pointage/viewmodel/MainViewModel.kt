@@ -75,7 +75,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val events = database.locationEventDao().getRecentEvents()
                 _locationEvents.value = events
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Handle error
                 _locationEvents.value = emptyList()
             }
@@ -93,7 +93,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 _totalTimeAway.value = totalTime
                 _totalTrips.value = totalTrips
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _totalTimeAway.value = 0L
                 _totalTrips.value = 0
             }
@@ -166,7 +166,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _locationEvents.value = emptyList()
                 _totalTimeAway.value = 0L
                 _totalTrips.value = 0
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Handle error
             }
         }

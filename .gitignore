@@ -3,6 +3,7 @@
 .idea/
 .gradle/
 local.properties
+gradle.properties.kts
 
 # Build outputs
 /build/

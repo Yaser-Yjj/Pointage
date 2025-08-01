@@ -21,7 +21,6 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d(TAG, "🚨 Geofence broadcast received")
 
         // Parse geofencing event from intent
         val geofencingEvent = GeofencingEvent.fromIntent(intent)
@@ -40,17 +39,9 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
         val geofenceTransition = geofencingEvent.geofenceTransition
         val triggeringGeofences = geofencingEvent.triggeringGeofences
 
-        Log.d(TAG, "Geofence transition: $geofenceTransition")
-        Log.d(TAG, "Triggering geofences: ${triggeringGeofences?.size ?: 0}")
-
         if (triggeringGeofences.isNullOrEmpty()) {
             Log.e(TAG, "❌ No triggering geofences found")
             return
-        }
-
-        // Log each triggering geofence
-        triggeringGeofences.forEach { geofence ->
-            Log.d(TAG, "Triggered geofence ID: ${geofence.requestId}")
         }
 
         // Handle different transition types
@@ -74,7 +65,6 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
      * Starts LocationTrackingService with ENTER action
      */
     private fun handleGeofenceEnter(context: Context) {
-        Log.d(TAG, "Processing geofence ENTER")
 
         val serviceIntent = Intent(context, LocationTrackingService::class.java).apply {
             action = LocationTrackingService.ACTION_GEOFENCE_ENTER
@@ -92,7 +82,6 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
      * Starts LocationTrackingService with EXIT action
      */
     private fun handleGeofenceExit(context: Context) {
-        Log.d(TAG, "Processing geofence EXIT")
 
         val serviceIntent = Intent(context, LocationTrackingService::class.java).apply {
             action = LocationTrackingService.ACTION_GEOFENCE_EXIT

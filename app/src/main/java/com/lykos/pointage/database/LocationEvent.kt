@@ -12,11 +12,11 @@ import java.util.Date
 data class LocationEvent(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val exitTime: Date?,           // When user left the safe zone
-    val enterTime: Date?,          // When user returned to safe zone
-    val totalTimeAway: Long,       // Duration away in milliseconds
-    val geofenceLat: Double = 0.0, // Geofence center latitude
-    val geofenceLng: Double = 0.0, // Geofence center longitude
-    val geofenceRadius: Float = 0f // Geofence radius in meters
+    val exitTime: Date?,
+    val enterTime: Date?,
+    val totalTimeAway: Long,
+    val geofenceLat: Double = 0.0,
+    val geofenceLng: Double = 0.0,
+    val geofenceRadius: Float = 0f
 )
 
