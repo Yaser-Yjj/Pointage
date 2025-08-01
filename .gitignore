@@ -54,3 +54,4 @@ outputs/
 
 # VSCode (if used)
 .vscode/
+/gradle.properties
