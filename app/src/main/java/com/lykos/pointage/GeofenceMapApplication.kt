@@ -5,25 +5,26 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import android.util.Log
-import androidx.room.Room
 import com.lykos.pointage.database.GeofenceDatabase
 
-class GeofenceApplication : Application() {
+/**
+ * Application class for initializing app-wide components
+ * - Creates notification channels
+ * - Initializes Room database
+ */
+class GeofenceMapApplication : Application() {
 
     companion object {
-        private const val TAG = "GeofenceApplication"
+        private const val TAG = "GeofenceMapApplication"
         const val NOTIFICATION_CHANNEL_ID = "geofence_channel"
         const val NOTIFICATION_CHANNEL_NAME = "Geofence Notifications"
         const val FOREGROUND_SERVICE_CHANNEL_ID = "location_service_channel"
-        const val FOREGROUND_SERVICE_CHANNEL_NAME = "Location Service"
+        const val FOREGROUND_SERVICE_CHANNEL_NAME = "Location Tracking Service"
     }
 
+    // Room database instance - lazy initialization
     val database by lazy {
-        Room.databaseBuilder(
-            applicationContext,
-            GeofenceDatabase::class.java,
-            "geofence_database"
-        ).build()
+        GeofenceDatabase.getDatabase(this)
     }
 
     override fun onCreate() {
@@ -32,29 +33,34 @@ class GeofenceApplication : Application() {
         createNotificationChannels()
     }
 
+    /**
+     * Creates notification channels for Android O+
+     * - Geofence events channel (high importance)
+     * - Foreground service channel (low importance)
+     */
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = getSystemService(NotificationManager::class.java)
 
-            // Channel for geofence notifications
+            // Channel for geofence event notifications
             val geofenceChannel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
                 NOTIFICATION_CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Notifications for geofence events"
+                description = "Notifications for geofence enter/exit events"
                 setShowBadge(true)
                 enableLights(true)
                 enableVibration(true)
             }
 
-            // Channel for foreground service
+            // Channel for foreground service (persistent notification)
             val serviceChannel = NotificationChannel(
                 FOREGROUND_SERVICE_CHANNEL_ID,
                 FOREGROUND_SERVICE_CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Background location service notifications"
+                description = "Background location tracking service"
                 setShowBadge(false)
                 enableLights(false)
                 enableVibration(false)
@@ -67,3 +73,4 @@ class GeofenceApplication : Application() {
         }
     }
 }
+

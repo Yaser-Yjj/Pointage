@@ -18,8 +18,13 @@
     <!-- Notification Permission (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Internet for Maps -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
 
     <application
+        android:name=".GeofenceMapApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -29,19 +34,24 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Pointage">
 
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
+
+
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
         <!-- Background Location Service -->
         <service
-            android:name=".service.BackgroundLocationService"
+            android:name=".service.LocationTrackingService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location" />
@@ -50,7 +60,7 @@
         <receiver
             android:name=".receiver.GeofenceBroadcastReceiver"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="true"/>
 
         <!-- Boot Receiver -->
         <receiver

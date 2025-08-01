@@ -6,6 +6,10 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import android.content.Context
 
+/**
+ * Room database for storing geofence events
+ * Uses singleton pattern for single database instance
+ */
 @Database(
     entities = [LocationEvent::class],
     version = 1,
@@ -13,13 +17,13 @@ import android.content.Context
 )
 @TypeConverters(Converters::class)
 abstract class GeofenceDatabase : RoomDatabase() {
-    
+
     abstract fun locationEventDao(): LocationEventDao
-    
+
     companion object {
         @Volatile
         private var INSTANCE: GeofenceDatabase? = null
-        
+
         fun getDatabase(context: Context): GeofenceDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(

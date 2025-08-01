@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Pointage</string>
+    <string name="google_maps_key">AIzaSyB6qtthTOJU1K7L6QMAsF6v7VyARFryyPs</string>
 </resources>
