@@ -19,6 +19,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_IS_ACTIVE = "geofence_is_active"
         private const val KEY_IS_TRACKING = "is_tracking"
         private const val KEY_IS_OUTSIDE = "is_outside_safe_zone"
+        private const val KEY_LAST_ENTER_TIMESTAMP = "last_enter_timestamp" // New
+        private const val KEY_LAST_EXIT_TIMESTAMP = "last_exit_timestamp"   // New
     }
 
     private val sharedPrefs: SharedPreferences =
@@ -30,6 +32,22 @@ class PreferencesManager(context: Context) {
 
     fun getState(): Boolean {
         return sharedPrefs.getBoolean(KEY_IS_OUTSIDE, false)
+    }
+
+    fun saveLastEnterTimestamp(timestamp: Long) {
+        sharedPrefs.edit { putLong(KEY_LAST_ENTER_TIMESTAMP, timestamp) }
+    }
+
+    fun getLastEnterTimestamp(): Long {
+        return sharedPrefs.getLong(KEY_LAST_ENTER_TIMESTAMP, 0L)
+    }
+
+    fun saveLastExitTimestamp(timestamp: Long) {
+        sharedPrefs.edit { putLong(KEY_LAST_EXIT_TIMESTAMP, timestamp) }
+    }
+
+    fun getLastExitTimestamp(): Long {
+        return sharedPrefs.getLong(KEY_LAST_EXIT_TIMESTAMP, 0L)
     }
 
     /**

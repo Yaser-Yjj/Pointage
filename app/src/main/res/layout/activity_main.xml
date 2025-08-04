@@ -41,6 +41,22 @@
             app:layout_constraintTop_toTopOf="parent" />
 
         <!-- Floating Button -->
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="16dp"
+            android:background="@drawable/bg_status_banner"
+            android:gravity="center"
+            android:padding="12dp"
+            android:text="Timer 00:00"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/btnCurrentLocation"
             android:layout_width="wrap_content"
@@ -52,18 +68,6 @@
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Floating Button -->
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/btnAddReport"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_margin="16dp"
-            android:contentDescription="Go to current location"
-            android:backgroundTint="@color/geofence_stroke"
-            android:src="@drawable/add_task"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent" />
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -72,20 +76,6 @@
             android:background="@color/white"
             app:layout_constraintBottom_toBottomOf="parent">
 
-            <!-- Status Text -->
-            <TextView
-                android:id="@+id/tvStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:background="@drawable/bg_status_banner"
-                android:gravity="center"
-                android:padding="12dp"
-                android:text="📍 Tap on map to select safe zone center"
-                android:textColor="@color/white"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
             <!-- Action Buttons -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -93,42 +83,68 @@
                 android:gravity="center"
                 android:orientation="vertical">
 
-                <!-- Start & Stop Tracking Buttons -->
-                <LinearLayout
+                <GridLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:orientation="horizontal">
+                    android:alignmentMode="alignMargins"
+                    android:columnCount="2"
+                    android:padding="8dp"
+                    android:rowCount="2"
+                    android:orientation="horizontal"
+                    android:useDefaultMargins="true">
 
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnStartTracking"
+                        android:id="@+id/btnRapport"
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
+                        android:layout_height="wrap_content"
+                        android:layout_columnWeight="1"
+                        android:layout_rowWeight="1"
                         android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:enabled="false"
-                        android:padding="8dp"
-                        android:text="Start Tracking"
-                        android:textColor="@color/black"
+                        android:layout_marginBottom="6dp"
+                        android:text="Rapport"
+                        android:textColor="@android:color/white"
+                        app:backgroundTint="@color/geofence_stroke"
                         app:cornerRadius="12dp"
-                        app:rippleColor="@color/white"
-                        app:strokeWidth="2dp" />
+                        app:rippleColor="@android:color/white" />
 
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnStopTracking"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:id="@+id/btnPV"
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_marginStart="6dp"
-                        android:layout_weight="1"
-                        android:enabled="false"
-                        android:padding="8dp"
-                        android:text="Stop Tracking"
-                        android:textColor="@color/geofence_stroke"
+                        android:layout_height="wrap_content"
+                        android:layout_columnWeight="1"
+                        android:layout_rowWeight="1"
+                        android:layout_marginBottom="6dp"
+                        android:text="PV"
+                        android:textColor="@android:color/white"
+                        app:backgroundTint="@color/geofence_stroke"
                         app:cornerRadius="12dp"
-                        app:rippleColor="@color/geofence_stroke"
-                        app:strokeWidth="2dp" />
-                </LinearLayout>
+                        app:rippleColor="@android:color/white"/>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnIntegrate"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_columnWeight="1"
+                        android:layout_rowWeight="1"
+                        android:layout_marginEnd="6dp"
+                        android:text="Integré les images"
+                        android:textColor="@android:color/white"
+                        app:backgroundTint="@color/geofence_stroke"
+                        app:cornerRadius="12dp"
+                        app:rippleColor="@android:color/white"/>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnImages"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_columnWeight="1"
+                        android:layout_rowWeight="1"
+                        android:text="Les Dépendances"
+                        android:textColor="@android:color/white"
+                        app:backgroundTint="@color/geofence_stroke"
+                        app:cornerRadius="12dp"
+                        app:rippleColor="@android:color/white"/>
+                </GridLayout>
 
             </LinearLayout>
         </LinearLayout>

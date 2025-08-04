@@ -14,7 +14,7 @@ class GeofenceManager(private val context: Context) {
 
     companion object {
         private const val TAG = "GeofenceManager"
-        private const val GEOFENCE_ID = "safe_zone_geofence"
+        private const val GEOFENCE_ID = "work_area_geofence"
         private const val GEOFENCE_EXPIRATION_TIME = Geofence.NEVER_EXPIRE
         private const val GEOFENCE_LOITERING_DELAY = 1000
     }
@@ -43,12 +43,12 @@ class GeofenceManager(private val context: Context) {
         val geofence = Geofence.Builder().setRequestId(GEOFENCE_ID)
             .setCircularRegion(latitude, longitude, radius)
             .setExpirationDuration(GEOFENCE_EXPIRATION_TIME).setTransitionTypes(
-                Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT or Geofence.GEOFENCE_TRANSITION_DWELL
+                Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT
             ).setLoiteringDelay(GEOFENCE_LOITERING_DELAY).build()
 
         val geofencingRequest = GeofencingRequest.Builder().setInitialTrigger(
-                GeofencingRequest.INITIAL_TRIGGER_ENTER or GeofencingRequest.INITIAL_TRIGGER_EXIT
-            ).addGeofence(geofence).build()
+            GeofencingRequest.INITIAL_TRIGGER_EXIT // Start with EXIT trigger to detect current state
+        ).addGeofence(geofence).build()
 
         try {
             geofencingClient.addGeofences(geofencingRequest, geofencePendingIntent)
@@ -86,12 +86,32 @@ class GeofenceManager(private val context: Context) {
                     GeofenceStatusCodes.GEOFENCE_NOT_AVAILABLE -> "Geofence service not available. Check location services."
                     GeofenceStatusCodes.GEOFENCE_TOO_MANY_GEOFENCES -> "Too many geofences registered."
                     GeofenceStatusCodes.GEOFENCE_TOO_MANY_PENDING_INTENTS -> "Too many pending intents for geofences."
-                    1000 -> "Location services unavailable. Enable high accuracy GPS."
+                    1000 -> "Location services unavailable. Enable high accuracy location."
                     else -> "Geofence error: ${exception.statusCode}"
                 }
             }
 
             else -> "Unknown geofence error: ${exception.message}"
         }
+    }
+
+    /**
+     * Check if user is currently inside the geofence area
+     * This can be used for initial state detection
+     */
+    fun getCurrentLocationStatus(
+        latitude: Double,
+        longitude: Double,
+        radius: Float,
+        currentLat: Double,
+        currentLng: Double
+    ): Boolean {
+        val distance = FloatArray(1)
+        android.location.Location.distanceBetween(
+            currentLat, currentLng,
+            latitude, longitude,
+            distance
+        )
+        return distance[0] <= radius
     }
 }

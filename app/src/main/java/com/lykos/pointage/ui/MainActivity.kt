@@ -15,8 +15,9 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
-import android.content.Context.RECEIVER_NOT_EXPORTED
+import android.os.Looper
 import android.widget.FrameLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -41,12 +42,14 @@ import com.lykos.pointage.databinding.ActivityMainBinding
 import com.lykos.pointage.service.LocationTrackingService
 import com.lykos.pointage.service.RetrofitClient
 import com.lykos.pointage.utils.GeofenceManager
+import com.lykos.pointage.utils.PreferencesManager
 import com.lykos.pointage.viewmodel.MainViewModel
 import kotlinx.coroutines.*
-import kotlin.math.log
+import android.os.Handler
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     companion object {
+        private const val TAG = "MainActivity" // Added TAG for consistent logging
         private const val DEFAULT_ZOOM = 15f
     }
 
@@ -59,6 +62,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private var geofenceCircle: Circle? = null
     private var geofenceRadius: Float = 100f
+
+    private lateinit var tvStatus: TextView
+    private lateinit var preferencesManager: PreferencesManager
+    private var timerHandler: Handler? = null
+    private var timerRunnable: Runnable? = null
+    private var startTime: Long = 0
+    private var isTimerRunning = false
 
     private val locationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -120,7 +130,94 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         setupButtonSheet()
-        navigateToReportPage()
+        navigateToPage()
+
+        initViews()
+        initPreferences()
+        updateTimerDisplay() // Initial call to set up timer display based on current state
+    }
+
+    private fun initViews() {
+        tvStatus = findViewById(R.id.tvStatus)
+    }
+
+    private fun initPreferences() {
+        preferencesManager = PreferencesManager(this)
+    }
+
+    private fun updateTimerDisplay() {
+        val isOutsideZone = preferencesManager.getState() // true = outside, false = inside
+        Log.d(TAG, "updateTimerDisplay called. isOutsideZone: $isOutsideZone")
+
+        if (!isOutsideZone) { // User is inside zone
+            startTimer()
+        } else { // User is outside zone
+            stopTimer()
+        }
+    }
+
+    private fun startTimer() {
+        // Always update startTime from preferences when starting/resuming the timer display
+        startTime = preferencesManager.getLastEnterTimestamp()
+        Log.d(TAG, "startTimer called. Retrieved lastEnterTimestamp from preferences: $startTime")
+
+        if (startTime == 0L) {
+            // Fallback: if no entry timestamp is recorded, use current time.
+            // This should ideally be set by the service's initial check.
+            startTime = System.currentTimeMillis()
+            preferencesManager.saveLastEnterTimestamp(startTime) // Persist this for consistency
+            Log.w(TAG, "startTime was 0L, initialized to current time: $startTime. This might indicate a missed initial enter event or app restart without prior entry.")
+        }
+
+        // Only create and post the runnable if it's not already running
+        if (!isTimerRunning) {
+            isTimerRunning = true
+            tvStatus.setBackgroundResource(R.drawable.bg_status_banner_active)
+            tvStatus.setTextColor(ContextCompat.getColor(this, R.color.white))
+
+            timerHandler = Handler(Looper.getMainLooper())
+            timerRunnable = object : Runnable {
+                override fun run() {
+                    if (isTimerRunning) {
+                        val elapsedTime = System.currentTimeMillis() - startTime
+                        val formattedTime = formatTime(elapsedTime)
+                        tvStatus.text = "⏱️ Timer $formattedTime"
+                        timerHandler?.postDelayed(this, 1000)
+                    }
+                }
+            }
+            timerHandler?.post(timerRunnable!!)
+            Log.d(TAG, "New timer runnable posted.")
+        } else {
+            Log.d(TAG, "Timer runnable already active.")
+        }
+    }
+
+    private fun stopTimer() {
+        if (isTimerRunning) {
+            isTimerRunning = false
+            timerHandler?.removeCallbacks(timerRunnable!!)
+            timerHandler = null
+            timerRunnable = null
+
+            tvStatus.setBackgroundResource(R.drawable.bg_status_banner)
+            tvStatus.setTextColor(ContextCompat.getColor(this, R.color.white))
+            tvStatus.text = "🔴 Outside Zone"
+            Log.d(TAG, "Timer stopped.")
+        }
+    }
+
+    private fun formatTime(milliseconds: Long): String {
+        val totalSeconds = milliseconds / 1000
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+
+        return if (hours > 0) {
+            String.format("%02d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format("%02d:%02d", minutes, seconds)
+        }
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
@@ -140,6 +237,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         viewModel.updateInsideGeofenceState()
+        updateTimerDisplay() // Ensure timer state is correct on activity start/resume
     }
 
     override fun onStop() {
@@ -147,10 +245,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         unregisterReceiver(geofenceStateReceiver)
     }
 
-    private fun navigateToReportPage() {
-        binding.btnAddReport.setOnClickListener {
+    private fun navigateToPage() {
+        // Consolidated redundant listeners for btnRapport
+        binding.btnRapport.setOnClickListener {
             startActivity(Intent(this, ReportActivity::class.java))
         }
+        // If btnPV, btnIntegrate, btnImages have other functionalities,
+        // their listeners should be defined separately.
     }
 
     private fun setupButtonSheet() {
@@ -173,29 +274,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun setupButtons() {
         binding.btnCurrentLocation.setOnClickListener { moveToCurrentLocation() }
-
-        binding.btnStartTracking.setOnClickListener {
-            startGeofenceTracking()
+        binding.btnRapport.setOnClickListener {
+            startActivity(Intent(this, ReportActivity::class.java))
         }
-
-        binding.btnStopTracking.setOnClickListener {
-            geofenceManager.removeGeofences { success ->
-                if (success) {
-                    Toast.makeText(this, "Tracking stopped", Toast.LENGTH_SHORT).show()
-                    viewModel.updateGeofenceActiveState(false)
-                    viewModel.updateTrackingState(false)
-                    val serviceIntent = Intent(this, LocationTrackingService::class.java).apply {
-                        action = LocationTrackingService.ACTION_STOP_TRACKING
-                    }
-                    stopService(serviceIntent)
-                    updateButtonStates()
-                    googleMap.clear() // Clear the geofence circle
-                } else {
-                    Toast.makeText(this, "Failed to stop tracking", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-        updateButtonStates() // Initial update of button states
     }
 
     @SuppressLint("SetTextI18n")
@@ -206,39 +287,37 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 if (::googleMap.isInitialized) {
                     val location = LatLng(it.latitude, it.longitude)
 
-                    // نجيب الحالة قبل من showGeofenceOnMap
                     val isInside = viewModel.isInsideGeofence.value ?: true
 
                     showGeofenceOnMap(location, geofenceRadius, isInside)
                     googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, DEFAULT_ZOOM))
 
-                    Log.d("logg", "viewModel.isTracking = ${viewModel.isTracking.value}")
+                    Log.d(TAG, "viewModel.isTracking = ${viewModel.isTracking.value}")
 
                     if (viewModel.isTracking.value != true) {
-                        Log.d("logg", "Tracking is NOT active, starting geofence tracking")
+                        Log.d(TAG, "Tracking is NOT active, starting geofence tracking")
                         startGeofenceTracking()
                     } else {
-                        Log.d("logg", "Tracking already active, will NOT start again")
+                        Log.d(TAG, "Tracking already active, will NOT start again")
                     }
                 }
             }
-            updateButtonStates()
         }
 
         viewModel.isInsideGeofence.observe(this) { isInside ->
             if (::googleMap.isInitialized && geofenceCircle != null) {
                 updateGeofenceCircleColor(isInside)
             }
-        }
-
-        viewModel.isTracking.observe(this) {
-            updateButtonStates()
+            updateTimerDisplay() // Trigger timer update when geofence state changes
         }
     }
 
     private val geofenceStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d(TAG, "Geofence state change broadcast received.")
             viewModel.updateInsideGeofenceState()
+            // updateTimerDisplay() is now called by the viewModel.isInsideGeofence.observe
+            // to avoid redundant calls and ensure state consistency.
         }
     }
 
@@ -292,25 +371,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                             longitude = zone.longitude,
                             radius = zone.radius
                         )
-                        withContext(Dispatchers.Main) {
-                            binding.tvStatus.text = "Safe zone loaded from server. Ready to track."
-                        }
                     } else {
                         withContext(Dispatchers.Main) {
-                            Log.e("SafeZone", "Fetched safe zone data is invalid or null.")
+                            Log.e(TAG, "Fetched safe zone data is invalid or null.")
                             Toast.makeText(
                                 this@MainActivity,
                                 "Failed to load safe zone from server. Geofence will not be active.",
                                 Toast.LENGTH_LONG
                             ).show()
-                            binding.tvStatus.text = "❌ Safe zone not configured."
-                            updateButtonStates()
                         }
                     }
                 } else {
                     withContext(Dispatchers.Main) {
                         Log.e(
-                            "SafeZone",
+                            TAG,
                             "Server Error: ${response.code()} - ${response.body()?.message}"
                         )
                         Toast.makeText(
@@ -318,20 +392,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                             "Failed to load safe zone from server. Geofence will not be active.",
                             Toast.LENGTH_LONG
                         ).show()
-                        binding.tvStatus.text = "❌ Safe zone not configured."
-                        updateButtonStates()
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Log.e("SafeZone", "Connection error", e)
+                    Log.e(TAG, "Connection error", e)
                     Toast.makeText(
                         this@MainActivity,
                         "Network error loading safe zone. Geofence will not be active.",
                         Toast.LENGTH_LONG
                     ).show()
-                    binding.tvStatus.text = "❌ Safe zone not configured."
-                    updateButtonStates()
                 }
             }
         }
@@ -358,12 +428,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
     private fun startGeofenceTracking() {
-        Log.d("logg", "startGeofenceTracking() called")
-        Log.d("logg", "viewModel.isTracking = ${viewModel.isTracking.value}")
+        Log.d(TAG, "startGeofenceTracking() called")
+        Log.d(TAG, "viewModel.isTracking = ${viewModel.isTracking.value}")
 
         val geofenceData = viewModel.geofenceData.value
         if (geofenceData == null || (geofenceData.latitude == 0.0 && geofenceData.longitude == 0.0)) {
-            Log.w("logg", "Geofence data is invalid or not set. Cannot start tracking.")
+            Log.w(TAG, "Geofence data is invalid or not set. Cannot start tracking.")
             Toast.makeText(
                 this, "Safe zone location not set. Cannot start tracking.", Toast.LENGTH_LONG
             ).show()
@@ -371,13 +441,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         if (viewModel.isTracking.value == true) {
-            Log.i("logg", "Tracking is already active. Aborting start.")
+            Log.i(TAG, "Tracking is already active. Aborting start.")
             Toast.makeText(this, "Tracking is already active.", Toast.LENGTH_SHORT).show()
             return
         }
 
         Log.d(
-            "logg",
+            TAG,
             "Creating geofence with lat=${geofenceData.latitude}, lng=${geofenceData.longitude}, radius=${geofenceData.radius}"
         )
         geofenceManager.createGeofence(
@@ -385,27 +455,26 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             longitude = geofenceData.longitude,
             radius = geofenceData.radius,
             onSuccess = {
-                Log.i("logg", "Geofence created successfully.")
+                Log.i(TAG, "Geofence created successfully.")
                 viewModel.updateGeofenceActiveState(true)
                 viewModel.updateTrackingState(true)
 
                 val serviceIntent = Intent(this, LocationTrackingService::class.java).apply {
                     action = LocationTrackingService.ACTION_START_TRACKING
                 }
-                Log.d("logg", "Starting LocationTrackingService with ACTION_START_TRACKING")
+                Log.d(TAG, "Starting LocationTrackingService with ACTION_START_TRACKING")
                 ContextCompat.startForegroundService(this, serviceIntent)
-                updateButtonStates()
                 Toast.makeText(this, "Tracking started successfully!", Toast.LENGTH_SHORT).show()
 
                 if (ActivityCompat.checkSelfPermission(
                         this, Manifest.permission.ACCESS_FINE_LOCATION
                     ) == PackageManager.PERMISSION_GRANTED
                 ) {
-                    Log.d("logg", "Permission granted, fetching last location for initial check.")
+                    Log.d(TAG, "Permission granted, fetching last location for initial check.")
                     fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                         location?.let {
                             Log.d(
-                                "logg",
+                                TAG,
                                 "Last location found: lat=${it.latitude}, lng=${it.longitude}"
                             )
                             val checkIntent =
@@ -416,24 +485,23 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                                 }
                             ContextCompat.startForegroundService(this, checkIntent)
                         } ?: run {
-                            Log.w("logg", "Last location is null for initial check.")
+                            Log.w(TAG, "Last location is null for initial check.")
                         }
                     }.addOnFailureListener { e ->
-                        Log.e("logg", "Failed to get last location for initial check: ${e.message}")
+                        Log.e(TAG, "Failed to get last location for initial check: ${e.message}")
                     }
                 } else {
                     Log.w(
-                        "logg",
+                        TAG,
                         "Fine location permission not granted, skipping initial location check."
                     )
                 }
             },
             onFailure = { error ->
-                Log.e("logg", "Geofence creation failed: $error")
+                Log.e(TAG, "Geofence creation failed: $error")
                 Toast.makeText(this, "Failed to start tracking: $error", Toast.LENGTH_LONG).show()
                 viewModel.updateGeofenceActiveState(false)
                 viewModel.updateTrackingState(false)
-                updateButtonStates()
             })
     }
 
@@ -456,27 +524,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }.addOnFailureListener {
             Toast.makeText(this, "Failed to get current location", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    @SuppressLint("SetTextI18n")
-    private fun updateButtonStates() {
-        val isTrackingActive = viewModel.isTracking.value == true
-        val geofenceConfigured =
-            viewModel.geofenceData.value != null && (viewModel.geofenceData.value?.latitude != 0.0 || viewModel.geofenceData.value?.longitude != 0.0)
-
-        binding.btnStartTracking.isEnabled = geofenceConfigured && !isTrackingActive
-        binding.btnStopTracking.isEnabled = isTrackingActive
-
-        if (isTrackingActive) {
-            binding.btnStartTracking.text = "Tracking..."
-            binding.tvStatus.text = "Safe zone tracking is ACTIVE"
-        } else if (geofenceConfigured) {
-            binding.btnStartTracking.text = "Start Tracking"
-            binding.tvStatus.text = "Safe zone configured. Ready to track."
-        } else {
-            binding.btnStartTracking.text = "Start Tracking"
-            binding.tvStatus.text = "❌ Safe zone not configured."
         }
     }
 
