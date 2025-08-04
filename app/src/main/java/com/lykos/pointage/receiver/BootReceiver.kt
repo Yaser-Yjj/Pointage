@@ -1,14 +1,21 @@
 package com.lykos.pointage.receiver
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.location.Location
 import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
+import com.google.android.gms.location.LocationServices
 import com.lykos.pointage.service.LocationTrackingService
 import com.lykos.pointage.utils.GeofenceManager
 import com.lykos.pointage.utils.PreferencesManager
-
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * BroadcastReceiver that handles device boot events
@@ -59,6 +66,32 @@ class BootReceiver : BroadcastReceiver() {
                                 action = LocationTrackingService.ACTION_START_TRACKING
                             }
                             ContextCompat.startForegroundService(context, serviceIntent)
+
+                            // --- NEW: Perform initial location check after boot ---
+                            if (ActivityCompat.checkSelfPermission(
+                                    context, Manifest.permission.ACCESS_FINE_LOCATION
+                                ) == PackageManager.PERMISSION_GRANTED
+                            ) {
+                                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                                CoroutineScope(Dispatchers.Main).launch { // Use Main dispatcher for addOnSuccessListener
+                                    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                                        location?.let {
+                                            val checkIntent = Intent(context, LocationTrackingService::class.java).apply {
+                                                action = LocationTrackingService.ACTION_CHECK_INITIAL_LOCATION
+                                                putExtra(LocationTrackingService.EXTRA_LATITUDE, it.latitude)
+                                                putExtra(LocationTrackingService.EXTRA_LONGITUDE, it.longitude)
+                                            }
+                                            ContextCompat.startForegroundService(context, checkIntent)
+                                            Log.d(TAG, "Sent initial location check to service after boot.")
+                                        } ?: run {
+                                            Log.w(TAG, "Last location is null for initial check after boot.")
+                                        }
+                                    }.addOnFailureListener { e ->
+                                        Log.e(TAG, "Failed to get last location for initial check after boot: ${e.message}")
+                                    }
+                                }
+                            }
+                            // --- END NEW ---
                         }
                     },
                     onFailure = { error ->
@@ -74,4 +107,3 @@ class BootReceiver : BroadcastReceiver() {
         }
     }
 }
-

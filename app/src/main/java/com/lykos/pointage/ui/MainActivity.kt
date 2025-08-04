@@ -40,6 +40,7 @@ import com.lykos.pointage.service.RetrofitClient
 import com.lykos.pointage.utils.GeofenceManager
 import com.lykos.pointage.viewmodel.MainViewModel
 import kotlinx.coroutines.*
+import kotlin.math.log
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     companion object {
@@ -93,6 +94,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         geofenceManager = GeofenceManager(this)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
 
+        viewModel.updateTrackingState(false)
+
         setupToolbar()
         setupMap()
         setupButtons()
@@ -142,27 +145,27 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun setupButtons() {
         binding.btnCurrentLocation.setOnClickListener { moveToCurrentLocation() }
 
-//        binding.btnStartTracking.setOnClickListener {
-////            startGeofenceTracking()
-////        }
-////
-////        binding.btnStopTracking.setOnClickListener {
-////            geofenceManager.removeGeofences { success ->
-////                if (success) {
-////                    Toast.makeText(this, "Tracking stopped", Toast.LENGTH_SHORT).show()
-////                    viewModel.updateGeofenceActiveState(false)
-////                    viewModel.updateTrackingState(false)
-////                    val serviceIntent = Intent(this, LocationTrackingService::class.java).apply {
-////                        action = LocationTrackingService.ACTION_STOP_TRACKING
-////                    }
-////                    stopService(serviceIntent)
-////                    updateButtonStates()
-////                    googleMap.clear() // Clear the geofence circle
-////                } else {
-////                    Toast.makeText(this, "Failed to stop tracking", Toast.LENGTH_SHORT).show()
-////                }
-////            }
-////        }
+        binding.btnStartTracking.setOnClickListener {
+            startGeofenceTracking()
+        }
+
+        binding.btnStopTracking.setOnClickListener {
+            geofenceManager.removeGeofences { success ->
+                if (success) {
+                    Toast.makeText(this, "Tracking stopped", Toast.LENGTH_SHORT).show()
+                    viewModel.updateGeofenceActiveState(false)
+                    viewModel.updateTrackingState(false)
+                    val serviceIntent = Intent(this, LocationTrackingService::class.java).apply {
+                        action = LocationTrackingService.ACTION_STOP_TRACKING
+                    }
+                    stopService(serviceIntent)
+                    updateButtonStates()
+                    googleMap.clear() // Clear the geofence circle
+                } else {
+                    Toast.makeText(this, "Failed to stop tracking", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
         updateButtonStates() // Initial update of button states
     }
 
@@ -176,19 +179,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                     showGeofenceOnMap(location, geofenceRadius)
                     googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, DEFAULT_ZOOM))
 
-                    // Automatically start tracking if geofence is configured and not already active
-                    Log.i(
-                        "logg",
-                        "geofence.isActive = ${it.isActive}, isTracking = ${viewModel.isTracking.value}"
-                    )
-                    if (viewModel.isTracking.value != true) {
-                        Log.i(
-                            "logg",
-                            "observeViewModel: Automatically start tracking if geofence is configured and not already active"
-                        )
-                        startGeofenceTracking()
-                    }
+                    Log.d("logg", "viewModel.isTracking = ${viewModel.isTracking.value}")
 
+                    if (viewModel.isTracking.value != true) {
+                        Log.d("logg", "Tracking is NOT active, starting geofence tracking")
+                        startGeofenceTracking()
+                    } else {
+                        Log.d("logg", "Tracking already active, will NOT start again")
+                    }
                 }
             }
             updateButtonStates()
@@ -218,7 +216,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
 
-    @SuppressLint("SetTextI18n")
     fun fetchSafeZone(userId: String) {
         lifecycleScope.launch {
             try {
@@ -237,15 +234,26 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                     } else {
                         withContext(Dispatchers.Main) {
                             Log.e("SafeZone", "Fetched safe zone data is invalid or null.")
-                            Toast.makeText(this@MainActivity, "Failed to load safe zone from server. Geofence will not be active.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Failed to load safe zone from server. Geofence will not be active.",
+                                Toast.LENGTH_LONG
+                            ).show()
                             binding.tvStatus.text = "❌ Safe zone not configured."
                             updateButtonStates()
                         }
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        Log.e("SafeZone", "Server Error: ${response.code()} - ${response.body()?.message}")
-                        Toast.makeText(this@MainActivity, "Failed to load safe zone from server. Geofence will not be active.", Toast.LENGTH_LONG).show()
+                        Log.e(
+                            "SafeZone",
+                            "Server Error: ${response.code()} - ${response.body()?.message}"
+                        )
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Failed to load safe zone from server. Geofence will not be active.",
+                            Toast.LENGTH_LONG
+                        ).show()
                         binding.tvStatus.text = "❌ Safe zone not configured."
                         updateButtonStates()
                     }
@@ -253,7 +261,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Log.e("SafeZone", "Connection error", e)
-                    Toast.makeText(this@MainActivity, "Network error loading safe zone. Geofence will not be active.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Network error loading safe zone. Geofence will not be active.",
+                        Toast.LENGTH_LONG
+                    ).show()
                     binding.tvStatus.text = "❌ Safe zone not configured."
                     updateButtonStates()
                 }
@@ -271,63 +283,87 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun startGeofenceTracking() {
+        Log.d("logg", "startGeofenceTracking() called")
+        Log.d("logg", "viewModel.isTracking = ${viewModel.isTracking.value}")
+
         val geofenceData = viewModel.geofenceData.value
         if (geofenceData == null || (geofenceData.latitude == 0.0 && geofenceData.longitude == 0.0)) {
-            Toast.makeText(this, "Safe zone location not set. Cannot start tracking.", Toast.LENGTH_LONG).show()
+            Log.w("logg", "Geofence data is invalid or not set. Cannot start tracking.")
+            Toast.makeText(
+                this,
+                "Safe zone location not set. Cannot start tracking.",
+                Toast.LENGTH_LONG
+            ).show()
             return
         }
 
         if (viewModel.isTracking.value == true) {
+            Log.i("logg", "Tracking is already active. Aborting start.")
             Toast.makeText(this, "Tracking is already active.", Toast.LENGTH_SHORT).show()
             return
         }
 
+        Log.d(
+            "logg",
+            "Creating geofence with lat=${geofenceData.latitude}, lng=${geofenceData.longitude}, radius=${geofenceData.radius}"
+        )
         geofenceManager.createGeofence(
             latitude = geofenceData.latitude,
             longitude = geofenceData.longitude,
             radius = geofenceData.radius,
             onSuccess = {
+                Log.i("logg", "Geofence created successfully.")
                 viewModel.updateGeofenceActiveState(true)
                 viewModel.updateTrackingState(true)
 
                 val serviceIntent = Intent(this, LocationTrackingService::class.java).apply {
                     action = LocationTrackingService.ACTION_START_TRACKING
                 }
+                Log.d("logg", "Starting LocationTrackingService with ACTION_START_TRACKING")
                 ContextCompat.startForegroundService(this, serviceIntent)
                 updateButtonStates()
                 Toast.makeText(this, "Tracking started successfully!", Toast.LENGTH_SHORT).show()
 
-                // --- NEW: Perform initial location check after geofence is set ---
                 if (ActivityCompat.checkSelfPermission(
                         this, Manifest.permission.ACCESS_FINE_LOCATION
                     ) == PackageManager.PERMISSION_GRANTED
                 ) {
+                    Log.d("logg", "Permission granted, fetching last location for initial check.")
                     fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                         location?.let {
-                            val checkIntent = Intent(this, LocationTrackingService::class.java).apply {
-                                action = LocationTrackingService.ACTION_CHECK_INITIAL_LOCATION
-                                putExtra("latitude", it.latitude)
-                                putExtra("longitude", it.longitude)
-                            }
+                            Log.d(
+                                "logg",
+                                "Last location found: lat=${it.latitude}, lng=${it.longitude}"
+                            )
+                            val checkIntent =
+                                Intent(this, LocationTrackingService::class.java).apply {
+                                    action = LocationTrackingService.ACTION_CHECK_INITIAL_LOCATION
+                                    putExtra(LocationTrackingService.EXTRA_LATITUDE, it.latitude)
+                                    putExtra(LocationTrackingService.EXTRA_LONGITUDE, it.longitude)
+                                }
                             ContextCompat.startForegroundService(this, checkIntent)
                         } ?: run {
-                            Log.w("MainActivity", "Last location is null for initial check.")
+                            Log.w("logg", "Last location is null for initial check.")
                         }
                     }.addOnFailureListener { e ->
-                        Log.e("MainActivity", "Failed to get last location for initial check: ${e.message}")
+                        Log.e("logg", "Failed to get last location for initial check: ${e.message}")
                     }
+                } else {
+                    Log.w(
+                        "logg",
+                        "Fine location permission not granted, skipping initial location check."
+                    )
                 }
-                // --- END NEW ---
-
             },
             onFailure = { error ->
+                Log.e("logg", "Geofence creation failed: $error")
                 Toast.makeText(this, "Failed to start tracking: $error", Toast.LENGTH_LONG).show()
-                Log.e("MainActivity", "Geofence creation failed: $error")
-                viewModel.updateGeofenceActiveState(false) // Ensure state is correct on failure
+                viewModel.updateGeofenceActiveState(false)
                 viewModel.updateTrackingState(false)
                 updateButtonStates()
             })
     }
+
 
     private fun moveToCurrentLocation() {
         if (ActivityCompat.checkSelfPermission(
@@ -547,5 +583,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onResume() {
         super.onResume()
         viewModel.refreshData()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
     }
 }

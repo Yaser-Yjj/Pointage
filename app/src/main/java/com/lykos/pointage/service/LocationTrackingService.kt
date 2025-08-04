@@ -37,6 +37,8 @@ class LocationTrackingService : LifecycleService() {
         const val ACTION_GEOFENCE_EXIT = "geofence_exit"
         const val ACTION_GEOFENCE_ENTER = "geofence_enter"
         const val ACTION_CHECK_INITIAL_LOCATION = "check_initial_location" // NEW ACTION
+        const val EXTRA_LATITUDE = "latitude"
+        const val EXTRA_LONGITUDE = "longitude"
 
         // Service state
         var isServiceRunning = false
@@ -56,6 +58,8 @@ class LocationTrackingService : LifecycleService() {
         notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         preferencesManager = PreferencesManager(this)
         isServiceRunning = true
+        isUserAway = false // Reset state on service creation
+        exitTimestamp = null
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -77,8 +81,8 @@ class LocationTrackingService : LifecycleService() {
                 handleGeofenceEnter()
             }
             ACTION_CHECK_INITIAL_LOCATION -> { // NEW: Handle initial location check
-                val currentLat = intent.getDoubleExtra("latitude", 0.0)
-                val currentLng = intent.getDoubleExtra("longitude", 0.0)
+                val currentLat = intent.getDoubleExtra(EXTRA_LATITUDE, 0.0)
+                val currentLng = intent.getDoubleExtra(EXTRA_LONGITUDE, 0.0)
                 if (currentLat != 0.0 || currentLng != 0.0) {
                     val currentLocation = Location("").apply {
                         latitude = currentLat
@@ -102,6 +106,7 @@ class LocationTrackingService : LifecycleService() {
         super.onDestroy()
         isServiceRunning = false
         isUserAway = false
+        exitTimestamp = null
         preferencesManager.setTrackingState(false)
     }
 
@@ -114,10 +119,8 @@ class LocationTrackingService : LifecycleService() {
      * Starts foreground service with persistent notification
      */
     private fun startForegroundTracking() {
-
         val notification = createServiceNotification("Monitoring safe zone", false)
         startForeground(NOTIFICATION_ID, notification)
-
         preferencesManager.setTrackingState(true)
     }
 
@@ -125,12 +128,10 @@ class LocationTrackingService : LifecycleService() {
      * Stops tracking and removes service
      */
     private fun stopTracking() {
-
-        // If user was away, handle the return
+        // If user was away, handle the return before stopping
         if (isUserAway) {
             handleGeofenceEnter()
         }
-
         preferencesManager.setTrackingState(false)
         stopForeground(true)
         stopSelf()
@@ -195,11 +196,20 @@ class LocationTrackingService : LifecycleService() {
                     try {
                         val latestEvent = database.locationEventDao().getLatestLocationEvent()
                         latestEvent?.let { event ->
-                            val updatedEvent = event.copy(
-                                enterTime = Date(enterTime),
-                                totalTimeAway = timeAway
-                            )
-                            database.locationEventDao().updateLocationEvent(updatedEvent)
+                            // Only update if this event corresponds to the last exit
+                            if (event.enterTime == null && event.exitTime?.time == exitTime) {
+                                val updatedEvent = event.copy(
+                                    enterTime = Date(enterTime),
+                                    totalTimeAway = timeAway
+                                )
+                                database.locationEventDao().updateLocationEvent(updatedEvent)
+                            } else if (event.enterTime == null) {
+                                // If there's an unclosed event but it's not the one we just exited,
+                                // it means the geofence system might have missed an exit.
+                                // For robustness, we can create a new entry for this enter.
+                                // Or, more simply, just ensure the current state is correct.
+                                Log.w(TAG, "Latest event not matching current exitTimestamp. Possible missed exit event.")
+                            }
                         }
                     } catch (e: Exception) {
                         Log.e(TAG, "Error updating enter event", e)
@@ -240,20 +250,60 @@ class LocationTrackingService : LifecycleService() {
 
         if (distance > radius) {
             // User is outside the geofence
-            Log.d(TAG, "Initial check: User is OUTSIDE safe zone.")
-            if (!isUserAway) { // Only trigger exit if not already marked as away
-                handleGeofenceExit()
+            Log.d(TAG, "Initial check: User is OUTSIDE safe zone. Setting state and showing notification.")
+            isUserAway = true
+            exitTimestamp = System.currentTimeMillis() // Assume they just exited for tracking purposes
+
+            // Save initial exit event to database if no ongoing away event
+            lifecycleScope.launch {
+                try {
+                    val latestEvent = database.locationEventDao().getLatestLocationEvent()
+                    // If there's no latest event, or the latest event has an enterTime (meaning it's closed)
+                    if (latestEvent == null || latestEvent.enterTime != null) {
+                        val locationEvent = LocationEvent(
+                            exitTime = Date(exitTimestamp!!),
+                            enterTime = null,
+                            totalTimeAway = 0,
+                            geofenceLat = geofencePrefs.latitude,
+                            geofenceLng = geofencePrefs.longitude,
+                            geofenceRadius = geofencePrefs.radius
+                        )
+                        database.locationEventDao().insertLocationEvent(locationEvent)
+                    } else {
+                        // There's an unclosed event, assume it's the one we're continuing
+                        Log.d(TAG, "Continuing existing unclosed exit event from initial check.")
+                        exitTimestamp = latestEvent.exitTime?.time ?: System.currentTimeMillis()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error saving initial exit event", e)
+                }
             }
+            updateServiceNotification("🔴 Outside safe zone - Timer running", true)
+            showAwayNotification()
         } else {
             // User is inside or at the edge of the geofence
-            Log.d(TAG, "Initial check: User is INSIDE safe zone.")
-            if (isUserAway) { // Only trigger enter if previously marked as away
-                handleGeofenceEnter()
-            } else {
-                // Already inside and not marked away, just ensure notifications are correct
-                updateServiceNotification("🟢 Inside safe zone - Monitoring", false)
-                cancelAwayNotification()
+            Log.d(TAG, "Initial check: User is INSIDE safe zone. Setting state and cancelling away notification.")
+            isUserAway = false
+            exitTimestamp = null // Ensure no pending exit timestamp
+
+            // If there was an ongoing away event, mark it as entered now
+            lifecycleScope.launch {
+                try {
+                    val latestEvent = database.locationEventDao().getLatestLocationEvent()
+                    if (latestEvent != null && latestEvent.enterTime == null) { // Ongoing away event
+                        val timeAway = System.currentTimeMillis() - (latestEvent.exitTime?.time ?: System.currentTimeMillis())
+                        val updatedEvent = latestEvent.copy(
+                            enterTime = Date(System.currentTimeMillis()),
+                            totalTimeAway = timeAway
+                        )
+                        database.locationEventDao().updateLocationEvent(updatedEvent)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error updating initial enter event", e)
+                }
             }
+            updateServiceNotification("🟢 Inside safe zone - Monitoring", false)
+            cancelAwayNotification()
         }
     }
 

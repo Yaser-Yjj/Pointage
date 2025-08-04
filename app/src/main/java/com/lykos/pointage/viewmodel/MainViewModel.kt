@@ -104,7 +104,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Saves geofence configuration
      */
     fun saveGeofenceData(latitude: Double, longitude: Double, radius: Float) {
-        val geofenceData = GeofenceData(latitude, longitude, radius, false)
+        val geofenceData = GeofenceData(latitude, longitude, radius, true)
         _geofenceData.value = geofenceData
 
         val preferences = GeofencePreferences(
