@@ -2,9 +2,11 @@ package com.lykos.pointage.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
@@ -13,11 +15,12 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
-import android.view.View
+import android.content.Context.RECEIVER_NOT_EXPORTED
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -96,6 +99,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         viewModel.updateTrackingState(false)
 
+        viewModel.updateInsideGeofenceState()
+
         setupToolbar()
         setupMap()
         setupButtons()
@@ -116,6 +121,30 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         setupButtonSheet()
         navigateToReportPage()
+    }
+
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    override fun onStart() {
+        super.onStart()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                geofenceStateReceiver,
+                IntentFilter("com.lykos.pointage.GEOFENCE_STATE_CHANGED"),
+                RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            @Suppress("DEPRECATION") registerReceiver(
+                geofenceStateReceiver, IntentFilter("com.lykos.pointage.GEOFENCE_STATE_CHANGED")
+            )
+        }
+
+        viewModel.updateInsideGeofenceState()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unregisterReceiver(geofenceStateReceiver)
     }
 
     private fun navigateToReportPage() {
@@ -176,7 +205,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 geofenceRadius = it.radius
                 if (::googleMap.isInitialized) {
                     val location = LatLng(it.latitude, it.longitude)
-                    showGeofenceOnMap(location, geofenceRadius)
+
+                    // نجيب الحالة قبل من showGeofenceOnMap
+                    val isInside = viewModel.isInsideGeofence.value ?: true
+
+                    showGeofenceOnMap(location, geofenceRadius, isInside)
                     googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, DEFAULT_ZOOM))
 
                     Log.d("logg", "viewModel.isTracking = ${viewModel.isTracking.value}")
@@ -192,8 +225,38 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             updateButtonStates()
         }
 
+        viewModel.isInsideGeofence.observe(this) { isInside ->
+            if (::googleMap.isInitialized && geofenceCircle != null) {
+                updateGeofenceCircleColor(isInside)
+            }
+        }
+
         viewModel.isTracking.observe(this) {
             updateButtonStates()
+        }
+    }
+
+    private val geofenceStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            viewModel.updateInsideGeofenceState()
+        }
+    }
+
+    private fun updateGeofenceCircleColor(isInside: Boolean) {
+        geofenceCircle?.let { circle ->
+            val strokeColor = if (isInside) {
+                ContextCompat.getColor(this, R.color.green_stroke)
+            } else {
+                ContextCompat.getColor(this, R.color.red_stroke)
+            }
+            val fillColor = if (isInside) {
+                ContextCompat.getColor(this, R.color.green_fill)
+            } else {
+                ContextCompat.getColor(this, R.color.red_fill)
+            }
+
+            circle.strokeColor = strokeColor
+            circle.fillColor = fillColor
         }
     }
 
@@ -203,6 +266,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         googleMap.uiSettings.isMyLocationButtonEnabled = false
 
         enableMyLocationIfPermitted()
+        viewModel.updateInsideGeofenceState()
 
         // Disable map interaction as per user request
         googleMap.setOnMapClickListener(null)
@@ -273,14 +337,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    private fun showGeofenceOnMap(location: LatLng, radius: Float) {
-        googleMap.clear() // Clear existing circles/markers
+    private fun showGeofenceOnMap(location: LatLng, radius: Float, isInside: Boolean) {
+        googleMap.clear()
+        val strokeColor = if (isInside) {
+            ContextCompat.getColor(this, R.color.green_stroke)
+        } else {
+            ContextCompat.getColor(this, R.color.red_stroke)
+        }
+        val fillColor = if (isInside) {
+            ContextCompat.getColor(this, R.color.green_fill)
+        } else {
+            ContextCompat.getColor(this, R.color.red_fill)
+        }
+
         geofenceCircle = googleMap.addCircle(
-            CircleOptions().center(location).radius(radius.toDouble())
-                .strokeColor(ContextCompat.getColor(this, R.color.geofence_stroke))
-                .fillColor(ContextCompat.getColor(this, R.color.geofence_fill)).strokeWidth(3f)
+            CircleOptions().center(location).radius(radius.toDouble()).strokeColor(strokeColor)
+                .fillColor(fillColor).strokeWidth(3f)
         )
     }
+
 
     private fun startGeofenceTracking() {
         Log.d("logg", "startGeofenceTracking() called")
@@ -290,9 +365,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         if (geofenceData == null || (geofenceData.latitude == 0.0 && geofenceData.longitude == 0.0)) {
             Log.w("logg", "Geofence data is invalid or not set. Cannot start tracking.")
             Toast.makeText(
-                this,
-                "Safe zone location not set. Cannot start tracking.",
-                Toast.LENGTH_LONG
+                this, "Safe zone location not set. Cannot start tracking.", Toast.LENGTH_LONG
             ).show()
             return
         }
@@ -389,8 +462,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     @SuppressLint("SetTextI18n")
     private fun updateButtonStates() {
         val isTrackingActive = viewModel.isTracking.value == true
-        val geofenceConfigured = viewModel.geofenceData.value != null &&
-                (viewModel.geofenceData.value?.latitude != 0.0 || viewModel.geofenceData.value?.longitude != 0.0)
+        val geofenceConfigured =
+            viewModel.geofenceData.value != null && (viewModel.geofenceData.value?.latitude != 0.0 || viewModel.geofenceData.value?.longitude != 0.0)
 
         binding.btnStartTracking.isEnabled = geofenceConfigured && !isTrackingActive
         binding.btnStopTracking.isEnabled = isTrackingActive

@@ -10,11 +10,13 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.lykos.pointage.GeofenceMapApplication
 import com.lykos.pointage.database.LocationEvent
 import com.lykos.pointage.ui.MainActivity
 import com.lykos.pointage.utils.PreferencesManager
+import com.lykos.pointage.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 import java.util.Date
 
@@ -144,6 +146,9 @@ class LocationTrackingService : LifecycleService() {
     private fun handleGeofenceExit() {
         Log.d(TAG, "🔴 User EXITED safe zone - Starting timer")
 
+        preferencesManager.setState(true) // ✅ الآن خارج safezone
+        broadcastGeofenceStateChange()
+
         // Only start timer if not already away
         if (!isUserAway) {
             isUserAway = true
@@ -173,12 +178,19 @@ class LocationTrackingService : LifecycleService() {
         showAwayNotification()
     }
 
+
+    private fun broadcastGeofenceStateChange() {
+        val intent = Intent("com.lykos.pointage.GEOFENCE_STATE_CHANGED")
+        sendBroadcast(intent)
+    }
     /**
      * Handles geofence enter event - user returned to safe zone
      * Stops timer and calculates time away
      */
     private fun handleGeofenceEnter() {
         Log.d(TAG, "🟢 User ENTERED safe zone - Stopping timer")
+        preferencesManager.setState(false) // ✅ الآن داخل safezone
+        broadcastGeofenceStateChange()
 
         // Only process if user was previously away
         if (isUserAway) {

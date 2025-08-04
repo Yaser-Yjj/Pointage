@@ -5,7 +5,12 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import android.util.Log
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.lykos.pointage.database.GeofenceDatabase
+import com.lykos.pointage.viewmodel.MainViewModel
+import okhttp3.internal.platform.PlatformRegistry.applicationContext
 
 /**
  * Application class for initializing app-wide components
@@ -20,6 +25,12 @@ class GeofenceMapApplication : Application() {
         const val NOTIFICATION_CHANNEL_NAME = "Geofence Notifications"
         const val FOREGROUND_SERVICE_CHANNEL_ID = "location_service_channel"
         const val FOREGROUND_SERVICE_CHANNEL_NAME = "Location Tracking Service"
+
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                MainViewModel(applicationContext as GeofenceMapApplication)
+            }
+        }
     }
 
     // Room database instance - lazy initialization
@@ -30,6 +41,13 @@ class GeofenceMapApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+    }
+    val viewModelFactory: ViewModelProvider.Factory by lazy {
+        viewModelFactory {
+            initializer {
+                MainViewModel(this@GeofenceMapApplication)
+            }
+        }
     }
 
     /**

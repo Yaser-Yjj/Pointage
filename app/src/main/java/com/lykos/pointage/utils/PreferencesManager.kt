@@ -18,10 +18,19 @@ class PreferencesManager(context: Context) {
         private const val KEY_RADIUS = "geofence_radius"
         private const val KEY_IS_ACTIVE = "geofence_is_active"
         private const val KEY_IS_TRACKING = "is_tracking"
+        private const val KEY_IS_OUTSIDE = "is_outside_safe_zone"
     }
 
     private val sharedPrefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    fun setState(isOutside: Boolean) {
+        sharedPrefs.edit { putBoolean(KEY_IS_OUTSIDE, isOutside) }
+    }
+
+    fun getState(): Boolean {
+        return sharedPrefs.getBoolean(KEY_IS_OUTSIDE, false)
+    }
 
     /**
      * Saves geofence configuration to SharedPreferences

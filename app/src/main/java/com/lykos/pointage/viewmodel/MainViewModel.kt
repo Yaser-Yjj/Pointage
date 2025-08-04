@@ -38,11 +38,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _totalTrips = MutableLiveData<Int>()
     val totalTrips: LiveData<Int> = _totalTrips
 
+    private val _isInsideGeofence = MutableLiveData<Boolean>()
+    val isInsideGeofence: LiveData<Boolean> = _isInsideGeofence
+
     init {
         loadGeofenceData()
         loadTrackingState()
         loadLocationEvents()
         loadStatistics()
+    }
+
+    fun updateInsideGeofenceState() {
+        val isOutside = preferencesManager.getState()
+        _isInsideGeofence.value = !isOutside
     }
 
     /**

@@ -10,4 +10,8 @@
     <color name="gris">#9E9E9E</color>
     <color name="bleu">#2196F3</color>
     <color name="blanc">#FFFFFF</color>
+    <color name="green_stroke">#4CAF50</color>
+    <color name="green_fill">#6F2E7D32</color>
+    <color name="red_stroke">#F44336</color>
+    <color name="red_fill">#77C62828</color>
 </resources>
