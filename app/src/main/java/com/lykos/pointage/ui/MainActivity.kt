@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
@@ -139,9 +140,30 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun setupButtons() {
-        binding.btnConfirmLocation.visibility = View.GONE
-        binding.btnStopTracking.visibility = View.GONE
         binding.btnCurrentLocation.setOnClickListener { moveToCurrentLocation() }
+
+//        binding.btnStartTracking.setOnClickListener {
+////            startGeofenceTracking()
+////        }
+////
+////        binding.btnStopTracking.setOnClickListener {
+////            geofenceManager.removeGeofences { success ->
+////                if (success) {
+////                    Toast.makeText(this, "Tracking stopped", Toast.LENGTH_SHORT).show()
+////                    viewModel.updateGeofenceActiveState(false)
+////                    viewModel.updateTrackingState(false)
+////                    val serviceIntent = Intent(this, LocationTrackingService::class.java).apply {
+////                        action = LocationTrackingService.ACTION_STOP_TRACKING
+////                    }
+////                    stopService(serviceIntent)
+////                    updateButtonStates()
+////                    googleMap.clear() // Clear the geofence circle
+////                } else {
+////                    Toast.makeText(this, "Failed to stop tracking", Toast.LENGTH_SHORT).show()
+////                }
+////            }
+////        }
+        updateButtonStates() // Initial update of button states
     }
 
     @SuppressLint("SetTextI18n")
@@ -153,9 +175,23 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                     val location = LatLng(it.latitude, it.longitude)
                     showGeofenceOnMap(location, geofenceRadius)
                     googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, DEFAULT_ZOOM))
-                    startGeofenceTracking()
+
+                    // Automatically start tracking if geofence is configured and not already active
+                    Log.i(
+                        "logg",
+                        "geofence.isActive = ${it.isActive}, isTracking = ${viewModel.isTracking.value}"
+                    )
+                    if (viewModel.isTracking.value != true) {
+                        Log.i(
+                            "logg",
+                            "observeViewModel: Automatically start tracking if geofence is configured and not already active"
+                        )
+                        startGeofenceTracking()
+                    }
+
                 }
             }
+            updateButtonStates()
         }
 
         viewModel.isTracking.observe(this) {
@@ -170,6 +206,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         enableMyLocationIfPermitted()
 
+        // Disable map interaction as per user request
         googleMap.setOnMapClickListener(null)
         googleMap.setOnMapLongClickListener(null)
         googleMap.uiSettings.isScrollGesturesEnabled = false
@@ -181,30 +218,52 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
 
+    @SuppressLint("SetTextI18n")
     fun fetchSafeZone(userId: String) {
         lifecycleScope.launch {
             try {
                 val response = RetrofitClient.instance.getSafeZone(userId)
                 if (response.isSuccessful && response.body()?.success == true) {
                     val zone = response.body()?.data
-                    viewModel.saveGeofenceData(
-                        latitude = zone?.latitude ?: 0.0,
-                        longitude = zone?.longitude ?: 0.0,
-                        radius = zone?.radius ?: 100f
-                    )
+                    if (zone != null && zone.latitude != 0.0 && zone.longitude != 0.0) {
+                        viewModel.saveGeofenceData(
+                            latitude = zone.latitude,
+                            longitude = zone.longitude,
+                            radius = zone.radius
+                        )
+                        withContext(Dispatchers.Main) {
+                            binding.tvStatus.text = "Safe zone loaded from server. Ready to track."
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            Log.e("SafeZone", "Fetched safe zone data is invalid or null.")
+                            Toast.makeText(this@MainActivity, "Failed to load safe zone from server. Geofence will not be active.", Toast.LENGTH_LONG).show()
+                            binding.tvStatus.text = "❌ Safe zone not configured."
+                            updateButtonStates()
+                        }
+                    }
                 } else {
-                    Log.e("SafeZone", "Server Error: ${response.body()?.message}")
+                    withContext(Dispatchers.Main) {
+                        Log.e("SafeZone", "Server Error: ${response.code()} - ${response.body()?.message}")
+                        Toast.makeText(this@MainActivity, "Failed to load safe zone from server. Geofence will not be active.", Toast.LENGTH_LONG).show()
+                        binding.tvStatus.text = "❌ Safe zone not configured."
+                        updateButtonStates()
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("SafeZone", "Connection error", e)
+                withContext(Dispatchers.Main) {
+                    Log.e("SafeZone", "Connection error", e)
+                    Toast.makeText(this@MainActivity, "Network error loading safe zone. Geofence will not be active.", Toast.LENGTH_LONG).show()
+                    binding.tvStatus.text = "❌ Safe zone not configured."
+                    updateButtonStates()
+                }
             }
         }
     }
 
     private fun showGeofenceOnMap(location: LatLng, radius: Float) {
-        geofenceCircle?.remove()
-        googleMap.clear()
-        googleMap.addCircle(
+        googleMap.clear() // Clear existing circles/markers
+        geofenceCircle = googleMap.addCircle(
             CircleOptions().center(location).radius(radius.toDouble())
                 .strokeColor(ContextCompat.getColor(this, R.color.geofence_stroke))
                 .fillColor(ContextCompat.getColor(this, R.color.geofence_fill)).strokeWidth(3f)
@@ -212,9 +271,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun startGeofenceTracking() {
-        val geofenceData = viewModel.geofenceData.value ?: return
+        val geofenceData = viewModel.geofenceData.value
+        if (geofenceData == null || (geofenceData.latitude == 0.0 && geofenceData.longitude == 0.0)) {
+            Toast.makeText(this, "Safe zone location not set. Cannot start tracking.", Toast.LENGTH_LONG).show()
+            return
+        }
 
-        if (viewModel.isTracking.value == true) return
+        if (viewModel.isTracking.value == true) {
+            Toast.makeText(this, "Tracking is already active.", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         geofenceManager.createGeofence(
             latitude = geofenceData.latitude,
@@ -229,9 +295,37 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
                 ContextCompat.startForegroundService(this, serviceIntent)
                 updateButtonStates()
+                Toast.makeText(this, "Tracking started successfully!", Toast.LENGTH_SHORT).show()
+
+                // --- NEW: Perform initial location check after geofence is set ---
+                if (ActivityCompat.checkSelfPermission(
+                        this, Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                        location?.let {
+                            val checkIntent = Intent(this, LocationTrackingService::class.java).apply {
+                                action = LocationTrackingService.ACTION_CHECK_INITIAL_LOCATION
+                                putExtra("latitude", it.latitude)
+                                putExtra("longitude", it.longitude)
+                            }
+                            ContextCompat.startForegroundService(this, checkIntent)
+                        } ?: run {
+                            Log.w("MainActivity", "Last location is null for initial check.")
+                        }
+                    }.addOnFailureListener { e ->
+                        Log.e("MainActivity", "Failed to get last location for initial check: ${e.message}")
+                    }
+                }
+                // --- END NEW ---
+
             },
             onFailure = { error ->
                 Toast.makeText(this, "Failed to start tracking: $error", Toast.LENGTH_LONG).show()
+                Log.e("MainActivity", "Geofence creation failed: $error")
+                viewModel.updateGeofenceActiveState(false) // Ensure state is correct on failure
+                viewModel.updateTrackingState(false)
+                updateButtonStates()
             })
     }
 
@@ -240,6 +334,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 this, Manifest.permission.ACCESS_FINE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
         ) {
+            Toast.makeText(this, "Location permission not granted.", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -247,8 +342,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             if (location != null) {
                 val currentLatLng = LatLng(location.latitude, location.longitude)
                 googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, DEFAULT_ZOOM))
-                Toast.makeText(this, "Tap on map to select safe zone center", Toast.LENGTH_LONG)
-                    .show()
             } else {
                 Toast.makeText(this, "Unable to get current location", Toast.LENGTH_SHORT).show()
             }
@@ -259,9 +352,23 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     @SuppressLint("SetTextI18n")
     private fun updateButtonStates() {
-        binding.btnStartTracking.isEnabled = false
-        binding.btnStartTracking.text = "Tracking..."
-        binding.tvStatus.text = "Safe zone tracking is ACTIVE"
+        val isTrackingActive = viewModel.isTracking.value == true
+        val geofenceConfigured = viewModel.geofenceData.value != null &&
+                (viewModel.geofenceData.value?.latitude != 0.0 || viewModel.geofenceData.value?.longitude != 0.0)
+
+        binding.btnStartTracking.isEnabled = geofenceConfigured && !isTrackingActive
+        binding.btnStopTracking.isEnabled = isTrackingActive
+
+        if (isTrackingActive) {
+            binding.btnStartTracking.text = "Tracking..."
+            binding.tvStatus.text = "Safe zone tracking is ACTIVE"
+        } else if (geofenceConfigured) {
+            binding.btnStartTracking.text = "Start Tracking"
+            binding.tvStatus.text = "Safe zone configured. Ready to track."
+        } else {
+            binding.btnStartTracking.text = "Start Tracking"
+            binding.tvStatus.text = "❌ Safe zone not configured."
+        }
     }
 
     // --- Permission Handling ---

@@ -95,46 +95,6 @@
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
-            <!-- Radius Control -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                android:baselineAligned="false"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:text="Radius:"
-                    android:textColor="@color/black"
-                    android:textSize="16sp" />
-
-                <SeekBar
-                    android:id="@+id/seekBarRadius"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:progressTint="@color/geofence_stroke"
-                    android:thumbTint="@color/geofence_stroke" />
-
-                <TextView
-                    android:id="@+id/tvRadiusValue"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:background="@drawable/bg_radius_badge"
-                    android:gravity="center"
-                    android:paddingHorizontal="12dp"
-                    android:text="100m"
-                    android:textColor="@color/white"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
             <!-- Action Buttons -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -178,21 +138,6 @@
                         app:rippleColor="@color/geofence_stroke"
                         app:strokeWidth="2dp" />
                 </LinearLayout>
-
-                <!-- Confirm Location Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnConfirmLocation"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginBottom="12dp"
-                    android:enabled="false"
-                    android:padding="8dp"
-                    android:text="Confirm Location"
-                    android:textColor="@color/geofence_stroke"
-                    app:cornerRadius="12dp"
-                    app:rippleColor="@color/geofence_stroke"
-                    app:strokeWidth="2dp" />
 
             </LinearLayout>
         </LinearLayout>
