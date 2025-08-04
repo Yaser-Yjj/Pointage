@@ -67,7 +67,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var preferencesManager: PreferencesManager
     private var timerHandler: Handler? = null
     private var timerRunnable: Runnable? = null
-    private var startTime: Long = 0
     private var isTimerRunning = false
 
     private val locationPermissionLauncher = registerForActivityResult(
@@ -157,18 +156,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun startTimer() {
-        // Always update startTime from preferences when starting/resuming the timer display
-        startTime = preferencesManager.getLastEnterTimestamp()
-        Log.d(TAG, "startTimer called. Retrieved lastEnterTimestamp from preferences: $startTime")
-
-        if (startTime == 0L) {
-            // Fallback: if no entry timestamp is recorded, use current time.
-            // This should ideally be set by the service's initial check.
-            startTime = System.currentTimeMillis()
-            preferencesManager.saveLastEnterTimestamp(startTime) // Persist this for consistency
-            Log.w(TAG, "startTime was 0L, initialized to current time: $startTime. This might indicate a missed initial enter event or app restart without prior entry.")
-        }
-
         // Only create and post the runnable if it's not already running
         if (!isTimerRunning) {
             isTimerRunning = true
@@ -179,15 +166,19 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             timerRunnable = object : Runnable {
                 override fun run() {
                     if (isTimerRunning) {
-                        val elapsedTime = System.currentTimeMillis() - startTime
-                        val formattedTime = formatTime(elapsedTime)
+                        val accumulatedTime = preferencesManager.getAccumulatedTimeInside()
+                        val sessionStartTime = preferencesManager.getLastEnterTimestamp()
+                        val currentSessionDuration = System.currentTimeMillis() - sessionStartTime
+                        val totalDisplayTime = accumulatedTime + currentSessionDuration
+
+                        val formattedTime = formatTime(totalDisplayTime)
                         tvStatus.text = "⏱️ Timer $formattedTime"
                         timerHandler?.postDelayed(this, 1000)
                     }
                 }
             }
             timerHandler?.post(timerRunnable!!)
-            Log.d(TAG, "New timer runnable posted.")
+            Log.d(TAG, "New timer runnable posted. Initial accumulated time: ${preferencesManager.getAccumulatedTimeInside()} ms, Session start: ${preferencesManager.getLastEnterTimestamp()} ms")
         } else {
             Log.d(TAG, "Timer runnable already active.")
         }
@@ -207,17 +198,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
+    // Modified formatTime to always show HH:MM:SS
     private fun formatTime(milliseconds: Long): String {
         val totalSeconds = milliseconds / 1000
         val hours = totalSeconds / 3600
         val minutes = (totalSeconds % 3600) / 60
         val seconds = totalSeconds % 60
 
-        return if (hours > 0) {
-            String.format("%02d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            String.format("%02d:%02d", minutes, seconds)
-        }
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")

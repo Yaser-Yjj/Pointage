@@ -45,7 +45,7 @@ class LocationTrackingService : LifecycleService() {
             private set
         var isUserAway = false
             private set
-        private var exitTimestamp: Long? = null
+        private var exitTimestamp: Long? = null // Timestamp when user *last* exited the zone
     }
 
     private lateinit var notificationManager: NotificationManager
@@ -144,10 +144,19 @@ class LocationTrackingService : LifecycleService() {
     private fun handleGeofenceExit() {
         Log.d(TAG, "🔴 User EXITED safe zone - Starting timer")
 
-        preferencesManager.setState(true) // ✅ الآن خارج safezone
+        preferencesManager.setState(true) // Set state to outside
         val currentExitTime = System.currentTimeMillis()
         preferencesManager.saveLastExitTimestamp(currentExitTime) // Save exit time
-        preferencesManager.saveLastEnterTimestamp(0L) // Clear last enter timestamp if outside
+
+        // If user was previously inside, calculate session duration and add to accumulated time
+        val lastEnterTime = preferencesManager.getLastEnterTimestamp()
+        if (lastEnterTime != 0L) {
+            val sessionDuration = currentExitTime - lastEnterTime
+            preferencesManager.addAccumulatedTimeInside(sessionDuration)
+            Log.d(TAG, "Added $sessionDuration ms to accumulated time. Total: ${preferencesManager.getAccumulatedTimeInside()} ms")
+        }
+        preferencesManager.saveLastEnterTimestamp(0L) // Clear last enter timestamp as session ended
+
         broadcastGeofenceStateChange()
 
         // Only start timer if not already away
@@ -190,9 +199,9 @@ class LocationTrackingService : LifecycleService() {
      */
     private fun handleGeofenceEnter() {
         Log.d(TAG, "🟢 User ENTERED safe zone - Stopping timer")
-        preferencesManager.setState(false) // ✅ الآن داخل safezone
+        preferencesManager.setState(false) // Set state to inside
         val currentEnterTime = System.currentTimeMillis()
-        preferencesManager.saveLastEnterTimestamp(currentEnterTime) // Save enter time
+        preferencesManager.saveLastEnterTimestamp(currentEnterTime) // Save enter time for current session
         preferencesManager.saveLastExitTimestamp(0L) // Clear last exit timestamp if inside
         broadcastGeofenceStateChange()
 

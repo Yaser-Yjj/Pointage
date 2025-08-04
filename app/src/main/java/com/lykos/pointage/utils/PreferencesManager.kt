@@ -19,8 +19,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_IS_ACTIVE = "geofence_is_active"
         private const val KEY_IS_TRACKING = "is_tracking"
         private const val KEY_IS_OUTSIDE = "is_outside_safe_zone"
-        private const val KEY_LAST_ENTER_TIMESTAMP = "last_enter_timestamp" // New
-        private const val KEY_LAST_EXIT_TIMESTAMP = "last_exit_timestamp"   // New
+        private const val KEY_LAST_ENTER_TIMESTAMP = "last_enter_timestamp" // Used for the start of the *session* inside
+        private const val KEY_LAST_EXIT_TIMESTAMP = "last_exit_timestamp"   // Used for the start of the *session* outside
+        private const val KEY_ACCUMULATED_TIME_INSIDE = "accumulated_time_inside" // New: Total time inside today
     }
 
     private val sharedPrefs: SharedPreferences =
@@ -34,6 +35,7 @@ class PreferencesManager(context: Context) {
         return sharedPrefs.getBoolean(KEY_IS_OUTSIDE, false)
     }
 
+    // For the start of the current continuous session inside the zone
     fun saveLastEnterTimestamp(timestamp: Long) {
         sharedPrefs.edit { putLong(KEY_LAST_ENTER_TIMESTAMP, timestamp) }
     }
@@ -42,12 +44,26 @@ class PreferencesManager(context: Context) {
         return sharedPrefs.getLong(KEY_LAST_ENTER_TIMESTAMP, 0L)
     }
 
+    // For the start of the current continuous session outside the zone
     fun saveLastExitTimestamp(timestamp: Long) {
         sharedPrefs.edit { putLong(KEY_LAST_EXIT_TIMESTAMP, timestamp) }
     }
 
     fun getLastExitTimestamp(): Long {
         return sharedPrefs.getLong(KEY_LAST_EXIT_TIMESTAMP, 0L)
+    }
+
+    fun addAccumulatedTimeInside(timeToAdd: Long) {
+        val currentAccumulated = getAccumulatedTimeInside()
+        sharedPrefs.edit { putLong(KEY_ACCUMULATED_TIME_INSIDE, currentAccumulated + timeToAdd) }
+    }
+
+    fun getAccumulatedTimeInside(): Long {
+        return sharedPrefs.getLong(KEY_ACCUMULATED_TIME_INSIDE, 0L)
+    }
+
+    fun resetAccumulatedTimeInside() {
+        sharedPrefs.edit { putLong(KEY_ACCUMULATED_TIME_INSIDE, 0L) }
     }
 
     /**
