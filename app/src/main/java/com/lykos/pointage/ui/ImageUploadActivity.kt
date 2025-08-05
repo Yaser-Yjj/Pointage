@@ -203,17 +203,17 @@ class ImageUploadActivity : AppCompatActivity() {
 
     private fun getFileFromUri(uri: Uri): File? {
         return try {
-            val inputStream: InputStream? = contentResolver.openInputStream(uri)
-            inputStream?.let {
-                val fileName = getFileName(uri) ?: "temp_image_${System.currentTimeMillis()}.jpg"
-                val file = File(cacheDir, fileName) // Use cache directory
-                FileOutputStream(file).use { outputStream ->
-                    it.copyTo(outputStream)
+            val inputStream = contentResolver.openInputStream(uri)
+            val fileName = getFileName(uri) ?: "temp_image_${System.currentTimeMillis()}.jpg"
+            val tempFile = File.createTempFile(fileName, null, cacheDir)
+            inputStream?.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    input.copyTo(output)
                 }
-                file
             }
+            tempFile
         } catch (e: Exception) {
-            Log.e("ReportActivity", "Error getting file from URI: $uri", e)
+            Log.e("Upload", "Error converting URI to File", e)
             null
         }
     }
@@ -242,12 +242,15 @@ class ImageUploadActivity : AppCompatActivity() {
     }
 
     private fun checkPermissionsAndShowImageSourceDialog() {
-        val permissions = mutableListOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        val permissions = mutableListOf<String>()
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
         } else {
-            permissions.add(Manifest.permission.CAMERA)
+            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
+
+        permissions.add(Manifest.permission.CAMERA)
 
         val ungranted = permissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
@@ -256,7 +259,7 @@ class ImageUploadActivity : AppCompatActivity() {
         if (ungranted.isEmpty()) {
             showImageSourceDialog()
         } else {
-            requestPermissionsLauncher.launch(permissions.toTypedArray())
+            requestPermissionsLauncher.launch(ungranted.toTypedArray())
         }
     }
 
