@@ -38,7 +38,9 @@ import com.google.android.gms.maps.model.Circle
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.CircleOptions
 import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.lykos.pointage.GeofenceMapApplication
 import com.lykos.pointage.R
+import com.lykos.pointage.database.GeofenceDatabase
 import com.lykos.pointage.databinding.ActivityMainBinding
 import com.lykos.pointage.service.LocationTrackingService
 import com.lykos.pointage.service.RetrofitClient
@@ -72,8 +74,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private var timerRunnable: Runnable? = null
     private var isTimerRunning = false
 
-
-    // Activity Result Launchers (only declared once)
+    private lateinit var database: GeofenceDatabase
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -120,6 +121,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         geofenceManager = GeofenceManager(this)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        database = (application as GeofenceMapApplication).database
 
         userID = "01987620-49fa-7398-8ce6-17b887e206dd"
 
@@ -453,7 +455,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             return
         }
 
-        // ✅ Only proceed if permission is granted
         if (ActivityCompat.checkSelfPermission(
                 this, Manifest.permission.ACCESS_FINE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
@@ -628,30 +629,45 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun showHistoryDialog() {
-        val events = viewModel.locationEvents.value?.take(5)
-        if (events.isNullOrEmpty()) {
-            Toast.makeText(this, "No events yet", Toast.LENGTH_SHORT).show()
-            return
+        lifecycleScope.launch {
+            try {
+                val dailyRecords = database.dailyInsideTimeDao().getAll().take(7)
+                val events = database.locationEventDao().getRecentEvents().take(5)
+
+                val history = StringBuilder()
+
+                if (dailyRecords.isNotEmpty()) {
+                    history.append("⏱️ Daily Time Inside Safe Zone:\n\n")
+                    dailyRecords.forEach { record ->
+                        val formatted = formatTime(record.totalTimeInside)
+                        history.append("${record.date}: $formatted\n")
+                    }
+                    history.append("\n")
+                }
+
+                if (events.isNotEmpty()) {
+                    history.append("🟢 Recent Sessions:\n\n")
+                    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+                    events.forEach { event ->
+                        val exit = event.exitTime?.let { sdf.format(it) } ?: "Unknown"
+                        val enter = event.enterTime?.let { sdf.format(it) } ?: "Still away"
+                        val duration = formatTime(event.totalTimeInside)
+                        history.append("Exit: $exit\nEnter: $enter\nDuration: $duration\n\n")
+                    }
+                }
+
+                if (history.isEmpty()) {
+                    history.append("No data yet.")
+                }
+
+                withContext(Dispatchers.Main) {
+                    AlertDialog.Builder(this@MainActivity).setTitle("History")
+                        .setMessage(history.toString()).setPositiveButton("OK", null).show()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading history", e)
+            }
         }
-
-        val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-        val history = StringBuilder("Last 5 Events:\n\n")
-        events.forEach { event ->
-            val exit = event.exitTime?.let { timeFormat.format(it) } ?: "Unknown"
-            val enter = event.enterTime?.let { timeFormat.format(it) } ?: "Still away"
-            val duration = if (event.totalTimeAway > 0) {
-                val seconds = event.totalTimeAway / 1000
-                val h = seconds / 3600
-                val m = (seconds % 3600) / 60
-                val s = seconds % 60
-                "%02d:%02d:%02d".format(h, m, s)
-            } else "In progress"
-
-            history.append("Exit: $exit\nEnter: $enter\nDuration: $duration\n\n")
-        }
-
-        AlertDialog.Builder(this).setTitle("History").setMessage(history.toString())
-            .setPositiveButton("OK", null).show()
     }
 
     override fun onResume() {

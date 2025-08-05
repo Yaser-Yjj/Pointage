@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface LocationEventDao {
-
     @Query("SELECT * FROM location_events ORDER BY id DESC")
     fun getAllLocationEvents(): Flow<List<LocationEvent>>
 
@@ -24,18 +23,15 @@ interface LocationEventDao {
     @Update
     suspend fun updateLocationEvent(locationEvent: LocationEvent)
 
-    @Delete
-    suspend fun deleteLocationEvent(locationEvent: LocationEvent)
-
     @Query("DELETE FROM location_events")
     suspend fun deleteAllLocationEvents()
 
-    @Query("SELECT SUM(totalTimeAway) FROM location_events WHERE totalTimeAway > 0")
-    suspend fun getTotalTimeAway(): Long?
+    @Query("SELECT SUM(totalTimeInside) FROM location_events WHERE totalTimeInside > 0")
+    suspend fun getTotalTimeInside(): Long?
 
-    @Query("SELECT COUNT(*) FROM location_events WHERE totalTimeAway > 0")
-    suspend fun getTotalTrips(): Int
+    @Query("SELECT COUNT(*) FROM location_events WHERE enterTime IS NOT NULL AND totalTimeInside > 0")
+    suspend fun getTotalSessions(): Int
 
-    @Query("SELECT * FROM location_events WHERE totalTimeAway > 0 ORDER BY id DESC LIMIT 10")
+    @Query("SELECT * FROM location_events WHERE totalTimeInside > 0 ORDER BY id DESC LIMIT 10")
     suspend fun getRecentEvents(): List<LocationEvent>
 }

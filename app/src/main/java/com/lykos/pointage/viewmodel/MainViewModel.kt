@@ -1,6 +1,7 @@
 package com.lykos.pointage.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -32,11 +33,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _locationEvents = MutableLiveData<List<LocationEvent>>()
     val locationEvents: LiveData<List<LocationEvent>> = _locationEvents
 
-    private val _totalTimeAway = MutableLiveData<Long>()
-    val totalTimeAway: LiveData<Long> = _totalTimeAway
-
-    private val _totalTrips = MutableLiveData<Int>()
-    val totalTrips: LiveData<Int> = _totalTrips
+    private val _totalTimeInside = MutableLiveData<Long>()
+    val totalTimeInside: LiveData<Long> = _totalTimeInside
 
     private val _isInsideGeofence = MutableLiveData<Boolean>()
     val isInsideGeofence: LiveData<Boolean> = _isInsideGeofence
@@ -96,14 +94,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadStatistics() {
         viewModelScope.launch {
             try {
-                val totalTime = database.locationEventDao().getTotalTimeAway() ?: 0L
-                val totalTrips = database.locationEventDao().getTotalTrips()
+                val totalTimeInside = database.locationEventDao().getTotalTimeInside() ?: 0L
 
-                _totalTimeAway.value = totalTime
-                _totalTrips.value = totalTrips
-            } catch (_: Exception) {
-                _totalTimeAway.value = 0L
-                _totalTrips.value = 0
+                _totalTimeInside.value = totalTimeInside
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error loading statistics", e)
+                _totalTimeInside.value = 0L
             }
         }
     }
@@ -172,8 +168,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _geofenceData.value = null
                 _isTracking.value = false
                 _locationEvents.value = emptyList()
-                _totalTimeAway.value = 0L
-                _totalTrips.value = 0
             } catch (_: Exception) {
                 // Handle error
             }

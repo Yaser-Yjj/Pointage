@@ -14,7 +14,7 @@ data class LocationEvent(
     val id: Long = 0,
     val exitTime: Date?,
     val enterTime: Date?,
-    val totalTimeAway: Long,
+    val totalTimeInside: Long,
     val geofenceLat: Double = 0.0,
     val geofenceLng: Double = 0.0,
     val geofenceRadius: Float = 0f
