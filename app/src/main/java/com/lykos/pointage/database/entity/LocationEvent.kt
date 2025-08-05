@@ -1,4 +1,4 @@
-package com.lykos.pointage.database
+package com.lykos.pointage.database.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -19,4 +19,3 @@ data class LocationEvent(
     val geofenceLng: Double = 0.0,
     val geofenceRadius: Float = 0f
 )
-

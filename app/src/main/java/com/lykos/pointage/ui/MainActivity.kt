@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import java.util.Date
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
@@ -45,11 +46,14 @@ import com.lykos.pointage.utils.GeofenceManager
 import com.lykos.pointage.utils.PreferencesManager
 import com.lykos.pointage.viewmodel.MainViewModel
 import kotlinx.coroutines.*
-import android.os.Handler
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
+
     companion object {
-        private const val TAG = "MainActivity" // Added TAG for consistent logging
+        private const val TAG = "MainActivity"
         private const val DEFAULT_ZOOM = 15f
     }
 
@@ -58,21 +62,43 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var geofenceManager: GeofenceManager
     private lateinit var locationManager: LocationManager
+    private lateinit var userID: String
     private val viewModel: MainViewModel by viewModels()
-
     private var geofenceCircle: Circle? = null
     private var geofenceRadius: Float = 100f
-
     private lateinit var tvStatus: TextView
     private lateinit var preferencesManager: PreferencesManager
-    private var timerHandler: Handler? = null
+    private var timerHandler: android.os.Handler? = null
     private var timerRunnable: Runnable? = null
     private var isTimerRunning = false
+
+
+    // Activity Result Launchers (only declared once)
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            requestLocationPermissions()
+        } else {
+            Toast.makeText(this, "Notification permission recommended", Toast.LENGTH_LONG).show()
+            requestLocationPermissions()
+        }
+    }
 
     private val locationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        handleLocationPermissionResult(permissions)
+        val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        if (fine && coarse) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                checkBackgroundLocationPermission()
+            } else {
+                checkLocationSettings()
+            }
+        } else {
+            showPermissionDeniedDialog()
+        }
     }
 
     private val backgroundLocationPermissionLauncher = registerForActivityResult(
@@ -85,56 +111,93 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            checkLocationPermissions()
-        } else {
-            Toast.makeText(this, "Notification permission recommended", Toast.LENGTH_LONG).show()
-            checkLocationPermissions()
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Initialize components
+        // Initialize core components
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         geofenceManager = GeofenceManager(this)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
 
-        viewModel.updateTrackingState(false)
+        userID = "01987620-49fa-7398-8ce6-17b887e206dd"
 
+        viewModel.updateTrackingState(false)
         viewModel.updateInsideGeofenceState()
 
         setupToolbar()
         setupMap()
         setupButtons()
         observeViewModel()
+        setupButtonSheet()
+        navigateToPage()
+        initViews()
+        initPreferences()
 
+        requestRequiredPermissionsAndProceed()
+    }
+
+    /**
+     * Request all required permissions in correct order
+     */
+    private fun requestRequiredPermissionsAndProceed() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this, Manifest.permission.POST_NOTIFICATIONS
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                checkLocationPermissions()
+                return
             }
-        } else {
-            checkLocationPermissions()
         }
 
-        setupButtonSheet()
-        navigateToPage()
+        val fineGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
-        initViews()
-        initPreferences()
-        updateTimerDisplay() // Initial call to set up timer display based on current state
+        if (!fineGranted || !coarseGranted) {
+            requestLocationPermissions()
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val bgGranted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_BACKGROUND_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!bgGranted) {
+                showBackgroundLocationDialog {
+                    backgroundLocationPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                }
+                return
+            }
+        }
+
+        if (!isLocationEnabled()) {
+            showLocationSettingsDialog()
+            return
+        }
+
+        onAllPermissionsAndLocationAvailable()
     }
+
+    /**
+     * This is the SAFE ZONE — all permissions + location enabled
+     */
+    private fun onAllPermissionsAndLocationAvailable() {
+        enableMyLocationIfPermitted()
+
+        fetchSafeZone(userId = userID)
+        updateTimerDisplay()
+
+        Toast.makeText(this, "✅ All permissions granted! Ready to track.", Toast.LENGTH_SHORT)
+            .show()
+    }
+
+    // MARK: - UI Setup
 
     private fun initViews() {
         tvStatus = findViewById(R.id.tvStatus)
@@ -148,40 +211,37 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         val isOutsideZone = preferencesManager.getState() // true = outside, false = inside
         Log.d(TAG, "updateTimerDisplay called. isOutsideZone: $isOutsideZone")
 
-        if (!isOutsideZone) { // User is inside zone
+        if (!isOutsideZone) {
             startTimer()
-        } else { // User is outside zone
+        } else {
             stopTimer()
         }
     }
 
     private fun startTimer() {
-        // Only create and post the runnable if it's not already running
-        if (!isTimerRunning) {
-            isTimerRunning = true
-            tvStatus.setBackgroundResource(R.drawable.bg_status_banner_active)
-            tvStatus.setTextColor(ContextCompat.getColor(this, R.color.white))
+        if (isTimerRunning) return
+        isTimerRunning = true
 
-            timerHandler = Handler(Looper.getMainLooper())
-            timerRunnable = object : Runnable {
-                override fun run() {
-                    if (isTimerRunning) {
-                        val accumulatedTime = preferencesManager.getAccumulatedTimeInside()
-                        val sessionStartTime = preferencesManager.getLastEnterTimestamp()
-                        val currentSessionDuration = System.currentTimeMillis() - sessionStartTime
-                        val totalDisplayTime = accumulatedTime + currentSessionDuration
+        tvStatus.setBackgroundResource(R.drawable.bg_status_banner_active)
+        tvStatus.setTextColor(ContextCompat.getColor(this, R.color.white))
 
-                        val formattedTime = formatTime(totalDisplayTime)
-                        tvStatus.text = "⏱️ Timer $formattedTime"
-                        timerHandler?.postDelayed(this, 1000)
-                    }
+        timerHandler = android.os.Handler(Looper.getMainLooper())
+        timerRunnable = object : Runnable {
+            @SuppressLint("SetTextI18n")
+            override fun run() {
+                if (isTimerRunning) {
+                    val accumulatedTime = preferencesManager.getAccumulatedTimeInside()
+                    val sessionStartTime = preferencesManager.getLastEnterTimestamp()
+                    val currentSessionDuration = System.currentTimeMillis() - sessionStartTime
+                    val totalDisplayTime = accumulatedTime + currentSessionDuration
+                    val formattedTime = formatTime(totalDisplayTime)
+                    tvStatus.text = "⏱️ Timer $formattedTime"
+                    timerHandler?.postDelayed(this, 1000)
                 }
             }
-            timerHandler?.post(timerRunnable!!)
-            Log.d(TAG, "New timer runnable posted. Initial accumulated time: ${preferencesManager.getAccumulatedTimeInside()} ms, Session start: ${preferencesManager.getLastEnterTimestamp()} ms")
-        } else {
-            Log.d(TAG, "Timer runnable already active.")
         }
+        timerHandler?.post(timerRunnable!!)
+        Log.d(TAG, "Timer started.")
     }
 
     private fun stopTimer() {
@@ -198,34 +258,29 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    // Modified formatTime to always show HH:MM:SS
+    @SuppressLint("DefaultLocale")
     private fun formatTime(milliseconds: Long): String {
         val totalSeconds = milliseconds / 1000
         val hours = totalSeconds / 3600
         val minutes = (totalSeconds % 3600) / 60
         val seconds = totalSeconds % 60
-
         return String.format("%02d:%02d:%02d", hours, minutes, seconds)
     }
+
+    // MARK: - Lifecycle
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onStart() {
         super.onStart()
+        val filter = IntentFilter("com.lykos.pointage.GEOFENCE_STATE_CHANGED")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(
-                geofenceStateReceiver,
-                IntentFilter("com.lykos.pointage.GEOFENCE_STATE_CHANGED"),
-                RECEIVER_NOT_EXPORTED
-            )
+            registerReceiver(geofenceStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
-            @Suppress("DEPRECATION") registerReceiver(
-                geofenceStateReceiver, IntentFilter("com.lykos.pointage.GEOFENCE_STATE_CHANGED")
-            )
+            @Suppress("DEPRECATION") registerReceiver(geofenceStateReceiver, filter)
         }
-
         viewModel.updateInsideGeofenceState()
-        updateTimerDisplay() // Ensure timer state is correct on activity start/resume
+        updateTimerDisplay()
     }
 
     override fun onStop() {
@@ -233,13 +288,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         unregisterReceiver(geofenceStateReceiver)
     }
 
+    // MARK: - UI Components
+
     private fun navigateToPage() {
-        // Consolidated redundant listeners for btnRapport
         binding.btnRapport.setOnClickListener {
             startActivity(Intent(this, ReportActivity::class.java))
         }
-        // If btnPV, btnIntegrate, btnImages have other functionalities,
-        // their listeners should be defined separately.
     }
 
     private fun setupButtonSheet() {
@@ -262,9 +316,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun setupButtons() {
         binding.btnCurrentLocation.setOnClickListener { moveToCurrentLocation() }
-        binding.btnRapport.setOnClickListener {
-            startActivity(Intent(this, ReportActivity::class.java))
-        }
     }
 
     @SuppressLint("SetTextI18n")
@@ -274,19 +325,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 geofenceRadius = it.radius
                 if (::googleMap.isInitialized) {
                     val location = LatLng(it.latitude, it.longitude)
-
                     val isInside = viewModel.isInsideGeofence.value ?: true
-
                     showGeofenceOnMap(location, geofenceRadius, isInside)
                     googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, DEFAULT_ZOOM))
 
-                    Log.d(TAG, "viewModel.isTracking = ${viewModel.isTracking.value}")
-
-                    if (viewModel.isTracking.value != true) {
-                        Log.d(TAG, "Tracking is NOT active, starting geofence tracking")
-                        startGeofenceTracking()
-                    } else {
-                        Log.d(TAG, "Tracking already active, will NOT start again")
+                    viewModel.isTracking.value?.let { it1 ->
+                        if (!it1) {
+                            startGeofenceTracking()
+                        }
                     }
                 }
             }
@@ -296,16 +342,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             if (::googleMap.isInitialized && geofenceCircle != null) {
                 updateGeofenceCircleColor(isInside)
             }
-            updateTimerDisplay() // Trigger timer update when geofence state changes
+            updateTimerDisplay()
         }
     }
 
     private val geofenceStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            Log.d(TAG, "Geofence state change broadcast received.")
             viewModel.updateInsideGeofenceState()
-            // updateTimerDisplay() is now called by the viewModel.isInsideGeofence.observe
-            // to avoid redundant calls and ensure state consistency.
         }
     }
 
@@ -321,7 +364,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             } else {
                 ContextCompat.getColor(this, R.color.red_fill)
             }
-
             circle.strokeColor = strokeColor
             circle.fillColor = fillColor
         }
@@ -332,10 +374,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         googleMap.uiSettings.isZoomControlsEnabled = true
         googleMap.uiSettings.isMyLocationButtonEnabled = false
 
-        enableMyLocationIfPermitted()
-        viewModel.updateInsideGeofenceState()
-
-        // Disable map interaction as per user request
+        // Disable gestures
         googleMap.setOnMapClickListener(null)
         googleMap.setOnMapLongClickListener(null)
         googleMap.uiSettings.isScrollGesturesEnabled = false
@@ -343,9 +382,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         googleMap.uiSettings.isRotateGesturesEnabled = false
         googleMap.uiSettings.isTiltGesturesEnabled = false
 
-        fetchSafeZone(userId = "68213301-7130-11f0-a8f7-a4bf012d9bf2")
+        enableMyLocationIfPermitted()
+
+        if (viewModel.geofenceData.value == null) {
+            fetchSafeZone(userId = userID)
+        } else {
+            val data = viewModel.geofenceData.value!!
+            val location = LatLng(data.latitude, data.longitude)
+            val isInside = viewModel.isInsideGeofence.value ?: true
+            showGeofenceOnMap(location, data.radius, isInside)
+            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, DEFAULT_ZOOM))
+        }
     }
 
+    // MARK: - Geofence & Location
 
     fun fetchSafeZone(userId: String) {
         lifecycleScope.launch {
@@ -354,42 +404,25 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 if (response.isSuccessful && response.body()?.success == true) {
                     val zone = response.body()?.data
                     if (zone != null && zone.latitude != 0.0 && zone.longitude != 0.0) {
-                        viewModel.saveGeofenceData(
-                            latitude = zone.latitude,
-                            longitude = zone.longitude,
-                            radius = zone.radius
-                        )
+                        viewModel.saveGeofenceData(zone.latitude, zone.longitude, zone.radius)
                     } else {
                         withContext(Dispatchers.Main) {
-                            Log.e(TAG, "Fetched safe zone data is invalid or null.")
                             Toast.makeText(
-                                this@MainActivity,
-                                "Failed to load safe zone from server. Geofence will not be active.",
-                                Toast.LENGTH_LONG
+                                this@MainActivity, "Invalid safe zone data.", Toast.LENGTH_LONG
                             ).show()
                         }
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        Log.e(
-                            TAG,
-                            "Server Error: ${response.code()} - ${response.body()?.message}"
-                        )
                         Toast.makeText(
-                            this@MainActivity,
-                            "Failed to load safe zone from server. Geofence will not be active.",
-                            Toast.LENGTH_LONG
+                            this@MainActivity, "Failed to load safe zone.", Toast.LENGTH_LONG
                         ).show()
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Log.e(TAG, "Connection error", e)
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Network error loading safe zone. Geofence will not be active.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Log.e(TAG, "Network error", e)
+                    Toast.makeText(this@MainActivity, "Network error.", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -397,16 +430,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun showGeofenceOnMap(location: LatLng, radius: Float, isInside: Boolean) {
         googleMap.clear()
-        val strokeColor = if (isInside) {
-            ContextCompat.getColor(this, R.color.green_stroke)
-        } else {
-            ContextCompat.getColor(this, R.color.red_stroke)
-        }
-        val fillColor = if (isInside) {
-            ContextCompat.getColor(this, R.color.green_fill)
-        } else {
-            ContextCompat.getColor(this, R.color.red_fill)
-        }
+        val strokeColor = if (isInside) ContextCompat.getColor(this, R.color.green_stroke)
+        else ContextCompat.getColor(this, R.color.red_stroke)
+        val fillColor = if (isInside) ContextCompat.getColor(this, R.color.green_fill)
+        else ContextCompat.getColor(this, R.color.red_fill)
 
         geofenceCircle = googleMap.addCircle(
             CircleOptions().center(location).radius(radius.toDouble()).strokeColor(strokeColor)
@@ -414,125 +441,89 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         )
     }
 
-
     private fun startGeofenceTracking() {
-        Log.d(TAG, "startGeofenceTracking() called")
-        Log.d(TAG, "viewModel.isTracking = ${viewModel.isTracking.value}")
-
         val geofenceData = viewModel.geofenceData.value
-        if (geofenceData == null || (geofenceData.latitude == 0.0 && geofenceData.longitude == 0.0)) {
-            Log.w(TAG, "Geofence data is invalid or not set. Cannot start tracking.")
-            Toast.makeText(
-                this, "Safe zone location not set. Cannot start tracking.", Toast.LENGTH_LONG
-            ).show()
+        if (geofenceData == null || geofenceData.latitude == 0.0) {
+            Toast.makeText(this, "Safe zone not set.", Toast.LENGTH_LONG).show()
             return
         }
 
         if (viewModel.isTracking.value == true) {
-            Log.i(TAG, "Tracking is already active. Aborting start.")
-            Toast.makeText(this, "Tracking is already active.", Toast.LENGTH_SHORT).show()
+            Log.d(TAG, "Tracking already active.")
             return
         }
 
-        Log.d(
-            TAG,
-            "Creating geofence with lat=${geofenceData.latitude}, lng=${geofenceData.longitude}, radius=${geofenceData.radius}"
-        )
+        // ✅ Only proceed if permission is granted
+        if (ActivityCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            Toast.makeText(this, "Location permission missing.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         geofenceManager.createGeofence(
             latitude = geofenceData.latitude,
             longitude = geofenceData.longitude,
             radius = geofenceData.radius,
             onSuccess = {
-                Log.i(TAG, "Geofence created successfully.")
-                viewModel.updateGeofenceActiveState(true)
                 viewModel.updateTrackingState(true)
-
                 val serviceIntent = Intent(this, LocationTrackingService::class.java).apply {
                     action = LocationTrackingService.ACTION_START_TRACKING
                 }
-                Log.d(TAG, "Starting LocationTrackingService with ACTION_START_TRACKING")
                 ContextCompat.startForegroundService(this, serviceIntent)
-                Toast.makeText(this, "Tracking started successfully!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Tracking started!", Toast.LENGTH_SHORT).show()
 
-                if (ActivityCompat.checkSelfPermission(
-                        this, Manifest.permission.ACCESS_FINE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED
-                ) {
-                    Log.d(TAG, "Permission granted, fetching last location for initial check.")
-                    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                        location?.let {
-                            Log.d(
-                                TAG,
-                                "Last location found: lat=${it.latitude}, lng=${it.longitude}"
-                            )
-                            val checkIntent =
-                                Intent(this, LocationTrackingService::class.java).apply {
-                                    action = LocationTrackingService.ACTION_CHECK_INITIAL_LOCATION
-                                    putExtra(LocationTrackingService.EXTRA_LATITUDE, it.latitude)
-                                    putExtra(LocationTrackingService.EXTRA_LONGITUDE, it.longitude)
-                                }
-                            ContextCompat.startForegroundService(this, checkIntent)
-                        } ?: run {
-                            Log.w(TAG, "Last location is null for initial check.")
+                // Optional: Check initial location
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    location?.let {
+                        val checkIntent = Intent(this, LocationTrackingService::class.java).apply {
+                            action = LocationTrackingService.ACTION_CHECK_INITIAL_LOCATION
+                            putExtra(LocationTrackingService.EXTRA_LATITUDE, it.latitude)
+                            putExtra(LocationTrackingService.EXTRA_LONGITUDE, it.longitude)
                         }
-                    }.addOnFailureListener { e ->
-                        Log.e(TAG, "Failed to get last location for initial check: ${e.message}")
+                        ContextCompat.startForegroundService(this, checkIntent)
                     }
-                } else {
-                    Log.w(
-                        TAG,
-                        "Fine location permission not granted, skipping initial location check."
-                    )
                 }
             },
             onFailure = { error ->
-                Log.e(TAG, "Geofence creation failed: $error")
-                Toast.makeText(this, "Failed to start tracking: $error", Toast.LENGTH_LONG).show()
-                viewModel.updateGeofenceActiveState(false)
+                Log.e(TAG, "Geofence failed: $error")
+                Toast.makeText(this, "Start failed: $error", Toast.LENGTH_LONG).show()
                 viewModel.updateTrackingState(false)
             })
     }
-
 
     private fun moveToCurrentLocation() {
         if (ActivityCompat.checkSelfPermission(
                 this, Manifest.permission.ACCESS_FINE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            Toast.makeText(this, "Location permission not granted.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Permission denied.", Toast.LENGTH_SHORT).show()
             return
         }
-
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-            if (location != null) {
-                val currentLatLng = LatLng(location.latitude, location.longitude)
-                googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, DEFAULT_ZOOM))
-            } else {
-                Toast.makeText(this, "Unable to get current location", Toast.LENGTH_SHORT).show()
-            }
-        }.addOnFailureListener {
-            Toast.makeText(this, "Failed to get current location", Toast.LENGTH_SHORT).show()
+            location?.let {
+                googleMap.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        LatLng(
+                            it.latitude, it.longitude
+                        ), DEFAULT_ZOOM
+                    )
+                )
+            } ?: Toast.makeText(this, "Location unavailable", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // --- Permission Handling ---
+    // MARK: - Permission Helpers
 
-    private fun checkLocationPermissions() {
-        val fine = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val coarse = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (fine && coarse) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                checkBackgroundLocationPermission()
-            } else {
-                checkLocationSettings()
-            }
-        } else {
-            requestLocationPermissions()
+    private fun requestLocationPermissions() {
+        showLocationPermissionDialog {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
     }
 
@@ -553,35 +544,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    private fun requestLocationPermissions() {
-        showLocationPermissionDialog {
-            locationPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
-        }
-    }
-
-    private fun handleLocationPermissionResult(permissions: Map<String, Boolean>) {
-        val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
-        val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
-
-        if (fine && coarse) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                checkBackgroundLocationPermission()
-            } else {
-                checkLocationSettings()
-            }
-        } else {
-            showPermissionDeniedDialog()
-        }
-    }
-
     private fun checkLocationSettings() {
         if (isLocationEnabled()) {
-            onAllPermissionsGranted()
+            onAllPermissionsAndLocationAvailable()
         } else {
             showLocationSettingsDialog()
         }
@@ -593,11 +558,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         )
     }
 
-    private fun onAllPermissionsGranted() {
-        enableMyLocationIfPermitted()
-        Toast.makeText(this, "✅ All permissions granted!", Toast.LENGTH_SHORT).show()
-    }
-
     private fun enableMyLocationIfPermitted() {
         if (::googleMap.isInitialized && ActivityCompat.checkSelfPermission(
                 this, Manifest.permission.ACCESS_FINE_LOCATION
@@ -607,10 +567,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    // --- Dialogs ---
+    // MARK: - Dialogs
 
     private fun showLocationPermissionDialog(onPositive: () -> Unit) {
-        AlertDialog.Builder(this).setTitle("Location Permission Required")
+        AlertDialog.Builder(this).setTitle("Location Access Required")
             .setMessage("This app needs location access to monitor your safe zone.")
             .setPositiveButton("Grant") { _, _ -> onPositive() }
             .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }.setCancelable(false)
@@ -642,17 +602,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun openAppSettings() {
-        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.fromParts("package", packageName, null)
+            startActivity(this)
         }
-        startActivity(intent)
     }
 
-    // --- Menu ---
+    // MARK: - Menu
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
-        menu.findItem(R.id.action_clear_data)?.isVisible = false // إخفاء Clear Data
+        menu.findItem(R.id.action_clear_data)?.isVisible = false
         return true
     }
 
@@ -674,12 +634,19 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             return
         }
 
+        val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
         val history = StringBuilder("Last 5 Events:\n\n")
         events.forEach { event ->
-            val exit = event.exitTime?.toString() ?: "Unknown"
-            val enter = event.enterTime?.toString() ?: "Still away"
-            val duration = if (event.totalTimeAway > 0) "${event.totalTimeAway / 60000} min"
-            else "In progress"
+            val exit = event.exitTime?.let { timeFormat.format(it) } ?: "Unknown"
+            val enter = event.enterTime?.let { timeFormat.format(it) } ?: "Still away"
+            val duration = if (event.totalTimeAway > 0) {
+                val seconds = event.totalTimeAway / 1000
+                val h = seconds / 3600
+                val m = (seconds % 3600) / 60
+                val s = seconds % 60
+                "%02d:%02d:%02d".format(h, m, s)
+            } else "In progress"
+
             history.append("Exit: $exit\nEnter: $enter\nDuration: $duration\n\n")
         }
 
@@ -687,10 +654,18 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             .setPositiveButton("OK", null).show()
     }
 
-
     override fun onResume() {
         super.onResume()
         viewModel.refreshData()
+
+        if (::googleMap.isInitialized) {
+            val geofenceData = viewModel.geofenceData.value
+            if (geofenceData != null) {
+                val location = LatLng(geofenceData.latitude, geofenceData.longitude)
+                val isInside = viewModel.isInsideGeofence.value ?: true
+                showGeofenceOnMap(location, geofenceData.radius, isInside)
+            }
+        }
     }
 
     override fun onDestroy() {

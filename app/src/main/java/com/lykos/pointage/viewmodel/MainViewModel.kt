@@ -6,7 +6,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.lykos.pointage.GeofenceMapApplication
-import com.lykos.pointage.database.LocationEvent
+import com.lykos.pointage.database.entity.LocationEvent
 import com.lykos.pointage.model.GeofenceData
 import com.lykos.pointage.model.GeofencePreferences
 import com.lykos.pointage.utils.PreferencesManager

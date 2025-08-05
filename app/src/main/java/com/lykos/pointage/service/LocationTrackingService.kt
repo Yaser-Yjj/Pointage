@@ -3,7 +3,6 @@ package com.lykos.pointage.service
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.location.Location
 import android.os.IBinder
@@ -12,7 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.lykos.pointage.GeofenceMapApplication
-import com.lykos.pointage.database.LocationEvent
+import com.lykos.pointage.database.entity.LocationEvent
 import com.lykos.pointage.ui.MainActivity
 import com.lykos.pointage.utils.PreferencesManager
 import kotlinx.coroutines.launch
@@ -144,16 +143,14 @@ class LocationTrackingService : LifecycleService() {
     private fun handleGeofenceExit() {
         Log.d(TAG, "🔴 User EXITED safe zone - Starting timer")
 
-        preferencesManager.setState(true) // Set state to outside
+        preferencesManager.setState(true)
         val currentExitTime = System.currentTimeMillis()
-        preferencesManager.saveLastExitTimestamp(currentExitTime) // Save exit time
+        preferencesManager.saveLastExitTimestamp(currentExitTime)
 
-        // If user was previously inside, calculate session duration and add to accumulated time
         val lastEnterTime = preferencesManager.getLastEnterTimestamp()
         if (lastEnterTime != 0L) {
             val sessionDuration = currentExitTime - lastEnterTime
             preferencesManager.addAccumulatedTimeInside(sessionDuration)
-            Log.d(TAG, "Added $sessionDuration ms to accumulated time. Total: ${preferencesManager.getAccumulatedTimeInside()} ms")
         }
         preferencesManager.saveLastEnterTimestamp(0L) // Clear last enter timestamp as session ended
 
@@ -199,29 +196,23 @@ class LocationTrackingService : LifecycleService() {
      */
     private fun handleGeofenceEnter() {
         Log.d(TAG, "🟢 User ENTERED safe zone - Stopping timer")
-        preferencesManager.setState(false) // Set state to inside
+        preferencesManager.setState(false)
         val currentEnterTime = System.currentTimeMillis()
-        preferencesManager.saveLastEnterTimestamp(currentEnterTime) // Save enter time for current session
-        preferencesManager.saveLastExitTimestamp(0L) // Clear last exit timestamp if inside
+        preferencesManager.saveLastEnterTimestamp(currentEnterTime)
+        preferencesManager.saveLastExitTimestamp(0L)
         broadcastGeofenceStateChange()
 
-        // Only process if user was previously away
         if (isUserAway) {
             val enterTime = currentEnterTime
             val exitTime = exitTimestamp
 
             if (exitTime != null) {
                 val timeAway = enterTime - exitTime
-                val timeAwayMinutes = timeAway / (1000 * 60)
 
-                Log.d(TAG, "Time away: $timeAwayMinutes minutes")
-
-                // Update database with enter time and duration
                 lifecycleScope.launch {
                     try {
                         val latestEvent = database.locationEventDao().getLatestLocationEvent()
                         latestEvent?.let { event ->
-                            // Only update if this event corresponds to the last exit
                             if (event.enterTime == null) {
                                 val updatedEvent = event.copy(
                                     enterTime = Date(enterTime),
@@ -272,19 +263,16 @@ class LocationTrackingService : LifecycleService() {
         Log.d(TAG, "Initial check: Distance to center: $distance m, Radius: $radius m")
 
         if (distance > radius) {
-            // User is outside the geofence
             Log.d(TAG, "Initial check: User is OUTSIDE safe zone. Setting state and showing notification.")
             isUserAway = true
-            exitTimestamp = System.currentTimeMillis() // Assume they just exited for tracking purposes
-            preferencesManager.setState(true) // Set initial state
-            preferencesManager.saveLastExitTimestamp(System.currentTimeMillis()) // Save initial exit time
-            preferencesManager.saveLastEnterTimestamp(0L) // Clear last enter timestamp if outside
+            exitTimestamp = System.currentTimeMillis()
+            preferencesManager.setState(true)
+            preferencesManager.saveLastExitTimestamp(System.currentTimeMillis())
+            preferencesManager.saveLastEnterTimestamp(0L)
 
-            // Save initial exit event to database if no ongoing away event
             lifecycleScope.launch {
                 try {
                     val latestEvent = database.locationEventDao().getLatestLocationEvent()
-                    // If there's no latest event, or the latest event has an enterTime (meaning it's closed)
                     if (latestEvent == null || latestEvent.enterTime != null) {
                         val locationEvent = LocationEvent(
                             exitTime = Date(exitTimestamp!!),
@@ -295,10 +283,7 @@ class LocationTrackingService : LifecycleService() {
                             geofenceRadius = geofencePrefs.radius
                         )
                         database.locationEventDao().insertLocationEvent(locationEvent)
-                        Log.d(TAG, "Initial check: Inserted new exit event.")
                     } else {
-                        // There's an unclosed event, assume it's the one we're continuing
-                        Log.d(TAG, "Initial check: Continuing existing unclosed exit event.")
                         exitTimestamp = latestEvent.exitTime?.time ?: System.currentTimeMillis()
                     }
                 } catch (e: Exception) {
@@ -308,16 +293,13 @@ class LocationTrackingService : LifecycleService() {
             updateServiceNotification("🔴 Outside safe zone - Timer running", true)
             showAwayNotification()
         } else {
-            // User is inside or at the edge of the geofence
-            Log.d(TAG, "Initial check: User is INSIDE safe zone. Setting state and cancelling away notification.")
             isUserAway = false
             exitTimestamp = null // Ensure no pending exit timestamp
             preferencesManager.setState(false) // Set initial state
             val initialEnterTime = System.currentTimeMillis()
-            preferencesManager.saveLastEnterTimestamp(initialEnterTime) // Save initial enter time
-            preferencesManager.saveLastExitTimestamp(0L) // Clear last exit timestamp if inside
+            preferencesManager.saveLastEnterTimestamp(initialEnterTime)
+            preferencesManager.saveLastExitTimestamp(0L)
 
-            // If there was an ongoing away event, mark it as entered now
             lifecycleScope.launch {
                 try {
                     val latestEvent = database.locationEventDao().getLatestLocationEvent()
@@ -328,7 +310,6 @@ class LocationTrackingService : LifecycleService() {
                             totalTimeAway = timeAway
                         )
                         database.locationEventDao().updateLocationEvent(updatedEvent)
-                        Log.d(TAG, "Initial check: Updated existing unclosed exit event to enter.")
                     } else {
                         Log.d(TAG, "Initial check: No unclosed exit event to update.")
                     }
