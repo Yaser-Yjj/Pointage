@@ -81,70 +81,49 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:orientation="vertical">
+                android:orientation="horizontal"
+                android:padding="8dp"
+                android:layout_marginTop="16dp">
 
-                <GridLayout
-                    android:layout_width="match_parent"
+                <!-- Left Button: PV -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPV"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:alignmentMode="alignMargins"
-                    android:columnCount="2"
-                    android:padding="8dp"
-                    android:rowCount="2"
-                    android:orientation="horizontal"
-                    android:useDefaultMargins="true">
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="PV"
+                    android:textColor="@android:color/white"
+                    app:backgroundTint="@color/geofence_stroke"
+                    app:cornerRadius="12dp"
+                    app:rippleColor="@android:color/white" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnRapport"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_columnWeight="1"
-                        android:layout_rowWeight="1"
-                        android:layout_marginEnd="6dp"
-                        android:layout_marginBottom="6dp"
-                        android:text="Rapport"
-                        android:textColor="@android:color/white"
-                        app:backgroundTint="@color/geofence_stroke"
-                        app:cornerRadius="12dp"
-                        app:rippleColor="@android:color/white" />
+                <!-- Middle Button: Report & Images -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnReportImages"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:text="Rapport &amp; Images"
+                    android:textColor="@android:color/white"
+                    app:backgroundTint="@color/geofence_stroke"
+                    app:cornerRadius="12dp"
+                    app:rippleColor="@android:color/white" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnPV"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_columnWeight="1"
-                        android:layout_rowWeight="1"
-                        android:layout_marginBottom="6dp"
-                        android:text="PV"
-                        android:textColor="@android:color/white"
-                        app:backgroundTint="@color/geofence_stroke"
-                        app:cornerRadius="12dp"
-                        app:rippleColor="@android:color/white"/>
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnIntegrate"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_columnWeight="1"
-                        android:layout_rowWeight="1"
-                        android:layout_marginEnd="6dp"
-                        android:text="Integré les images"
-                        android:textColor="@android:color/white"
-                        app:backgroundTint="@color/geofence_stroke"
-                        app:cornerRadius="12dp"
-                        app:rippleColor="@android:color/white"/>
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnImages"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_columnWeight="1"
-                        android:layout_rowWeight="1"
-                        android:text="Les Dépendances"
-                        android:textColor="@android:color/white"
-                        app:backgroundTint="@color/geofence_stroke"
-                        app:cornerRadius="12dp"
-                        app:rippleColor="@android:color/white"/>
-                </GridLayout>
+                <!-- Right Button: Intégrer -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDepend"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:text="Contrainte"
+                    android:textColor="@android:color/white"
+                    app:backgroundTint="@color/geofence_stroke"
+                    app:cornerRadius="12dp"
+                    app:rippleColor="@android:color/white" />
 
             </LinearLayout>
         </LinearLayout>

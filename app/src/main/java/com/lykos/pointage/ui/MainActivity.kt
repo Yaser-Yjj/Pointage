@@ -50,7 +50,6 @@ import com.lykos.pointage.viewmodel.MainViewModel
 import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.Locale
-import java.util.TimeZone
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -293,8 +292,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     // MARK: - UI Components
 
     private fun navigateToPage() {
-        binding.btnRapport.setOnClickListener {
-            startActivity(Intent(this, ReportActivity::class.java))
+        binding.btnReportImages.setOnClickListener {
+            startActivity(Intent(this, DailyReportActivity::class.java))
         }
     }
 

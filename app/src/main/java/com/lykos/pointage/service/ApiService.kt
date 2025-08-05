@@ -13,13 +13,14 @@ import retrofit2.http.Part
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.http.GET
+import retrofit2.http.PartMap
 import retrofit2.http.Query
 
 interface ApiService {
     @Multipart
-    @POST("upload_report")
+    @POST("upload_report/")
     suspend fun uploadReport(
-        @Part("username") username: RequestBody,
+        @Part("user_id") userId: RequestBody,
         @Part("report_text") reportText: RequestBody,
         @Part images: List<MultipartBody.Part>
     ): Response<ReportResponse>
