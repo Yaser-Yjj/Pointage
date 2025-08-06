@@ -1,4 +1,24 @@
 <resources>
     <string name="app_name">Pointage</string>
     <string name="google_maps_key">AIzaSyB6qtthTOJU1K7L6QMAsF6v7VyARFryyPs</string>
+    <string name="email_label">Email Address</string>
+    <string name="email_hint">Enter your email address</string>
+    <string name="password_label">Password</string>
+    <string name="password_hint">Enter your password</string>
+    <string name="confirm_password_label">Confirm password</string>
+    <string name="confirm_password_hint">Confirm your password</string>
+    <string name="save_login_details_text">Save your login details so you can connect more easily</string>
+    <string name="terms_of_use_text">I accept the terms of use</string>
+    <string name="sign_up_button_text">Sign Up</string>
+    <string name="sign_in_title">Sign In</string>
+    <string name="sign_in_description">Fill in the fields below to access your account</string>
+    <string name="email_or_username_label">Email or username</string>
+    <string name="email_or_username_hint">Enter your email or username</string>
+    <string name="forgot_password_text">Forgot password?</string>
+    <string name="remember_me_text">Remember me</string>
+    <string name="sign_in_button_text">Sign in</string>
+    <string name="connect_with_text">Connect with</string>
+    <string name="sign_in_with_google_text">Sign in with Google</string>
+    <string name="dont_have_account_text">Don’t have an account ?</string>
+    <string name="create_account_text">Contact your admin</string>
 </resources>

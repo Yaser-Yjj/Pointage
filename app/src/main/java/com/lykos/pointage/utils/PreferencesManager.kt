@@ -2,7 +2,7 @@ package com.lykos.pointage.utils
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.lykos.pointage.model.GeofencePreferences
+import com.lykos.pointage.model.data.GeofencePreferences
 import androidx.core.content.edit
 
 /**

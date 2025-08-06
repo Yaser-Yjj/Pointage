@@ -33,10 +33,17 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_app"
         android:label="@string/app_name"
+        android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_app_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Pointage"
-        android:requestLegacyExternalStorage="true">
+        android:theme="@style/Theme.Pointage">
+        <activity
+            android:name=".ui.SignInActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.PvReportActivity"
+            android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -51,10 +58,13 @@
         <activity
             android:name=".ui.ImageUploadActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".ui.ExpensesActivity"
+            android:exported="false" />
         <activity
             android:name=".ui.DailyReportActivity"
-            android:exported="false" />
-        <!-- Google Maps API Key -->
+            android:exported="false" /> <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
@@ -67,9 +77,7 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
-
-        <!-- Background Location Service -->
+        </activity> <!-- Background Location Service -->
         <service
             android:name=".service.LocationTrackingService"
             android:enabled="true"

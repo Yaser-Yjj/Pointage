@@ -1,4 +1,4 @@
-package com.lykos.pointage.model
+package com.lykos.pointage.model.data
 
 data class SafeZoneData(
     val latitude: Double,

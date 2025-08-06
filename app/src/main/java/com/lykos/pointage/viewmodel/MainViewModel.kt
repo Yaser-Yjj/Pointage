@@ -8,8 +8,8 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.lykos.pointage.GeofenceMapApplication
 import com.lykos.pointage.database.entity.LocationEvent
-import com.lykos.pointage.model.GeofenceData
-import com.lykos.pointage.model.GeofencePreferences
+import com.lykos.pointage.model.data.GeofenceData
+import com.lykos.pointage.model.data.GeofencePreferences
 import com.lykos.pointage.utils.PreferencesManager
 import kotlinx.coroutines.launch
 

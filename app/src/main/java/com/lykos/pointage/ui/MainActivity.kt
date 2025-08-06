@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import java.util.Date
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
@@ -295,6 +294,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         binding.btnReportImages.setOnClickListener {
             startActivity(Intent(this, DailyReportActivity::class.java))
         }
+
+        binding.btnPV.setOnClickListener {
+            startActivity(Intent(this, PvReportActivity::class.java))
+        }
+
+        binding.btnDepend.setOnClickListener {
+            startActivity(Intent(this, ExpensesActivity::class.java))
+        }
+
     }
 
     private fun setupButtonSheet() {
@@ -401,7 +409,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     fun fetchSafeZone(userId: String) {
         lifecycleScope.launch {
             try {
-                val response = RetrofitClient.instance.getSafeZone(userId)
+                val response = RetrofitClient.apiService.getSafeZone(userId)
                 if (response.isSuccessful && response.body()?.success == true) {
                     val zone = response.body()?.data
                     if (zone != null && zone.latitude != 0.0 && zone.longitude != 0.0) {

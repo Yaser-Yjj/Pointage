@@ -1,7 +1,6 @@
 package com.lykos.pointage.ui
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -33,7 +32,6 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.FileOutputStream
-import java.io.InputStream
 
 class ImageUploadActivity : AppCompatActivity() {
 
@@ -176,7 +174,7 @@ class ImageUploadActivity : AppCompatActivity() {
                 }
 
 
-                val response = RetrofitClient.instance.uploadReport(
+                val response = RetrofitClient.apiService.uploadReport(
                     userIdPart,
                     reportTextPart,
                     imageParts

@@ -1,4 +1,4 @@
-package com.lykos.pointage.model
+package com.lykos.pointage.model.data
 
 import android.os.Parcelable
 import kotlinx.parcelize.Parcelize

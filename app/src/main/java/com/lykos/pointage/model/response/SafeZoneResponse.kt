@@ -1,4 +1,6 @@
-package com.lykos.pointage.model
+package com.lykos.pointage.model.response
+
+import com.lykos.pointage.model.data.SafeZoneData
 
 
 data class SafeZoneResponse(
