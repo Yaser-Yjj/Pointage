@@ -39,8 +39,12 @@
         android:theme="@style/Theme.Pointage">
         <activity
             android:name=".ui.SignInActivity"
-            android:exported="false" />
+            android:exported="true" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
 
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter></activity>
         <activity
             android:name=".ui.PvReportActivity"
             android:exported="false" />
@@ -71,13 +75,7 @@
 
         <activity
             android:name=".ui.MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity> <!-- Background Location Service -->
+            android:exported="true"/>
         <service
             android:name=".service.LocationTrackingService"
             android:enabled="true"

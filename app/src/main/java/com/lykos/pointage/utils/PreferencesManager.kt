@@ -19,13 +19,23 @@ class PreferencesManager(context: Context) {
         private const val KEY_IS_ACTIVE = "geofence_is_active"
         private const val KEY_IS_TRACKING = "is_tracking"
         private const val KEY_IS_OUTSIDE = "is_outside_safe_zone"
-        private const val KEY_LAST_ENTER_TIMESTAMP = "last_enter_timestamp" // Used for the start of the *session* inside
-        private const val KEY_LAST_EXIT_TIMESTAMP = "last_exit_timestamp"   // Used for the start of the *session* outside
-        private const val KEY_ACCUMULATED_TIME_INSIDE = "accumulated_time_inside" // New: Total time inside today
+        private const val KEY_LAST_ENTER_TIMESTAMP = "last_enter_timestamp"
+        private const val KEY_LAST_EXIT_TIMESTAMP = "last_exit_timestamp"
+        private const val KEY_ACCUMULATED_TIME_INSIDE = "accumulated_time_inside"
+        private const val KEY_CURRENT_USER_ID = "current_user_id"
     }
 
     private val sharedPrefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+
+    fun saveCurrentUserId(userId: String) {
+        sharedPrefs.edit { putString(KEY_CURRENT_USER_ID, userId) }
+    }
+
+    fun getCurrentUserId(): String? {
+        return sharedPrefs.getString(KEY_CURRENT_USER_ID, null)
+    }
 
     fun setState(isOutside: Boolean) {
         sharedPrefs.edit { putBoolean(KEY_IS_OUTSIDE, isOutside) }
@@ -35,7 +45,6 @@ class PreferencesManager(context: Context) {
         return sharedPrefs.getBoolean(KEY_IS_OUTSIDE, false)
     }
 
-    // For the start of the current continuous session inside the zone
     fun saveLastEnterTimestamp(timestamp: Long) {
         sharedPrefs.edit { putLong(KEY_LAST_ENTER_TIMESTAMP, timestamp) }
     }

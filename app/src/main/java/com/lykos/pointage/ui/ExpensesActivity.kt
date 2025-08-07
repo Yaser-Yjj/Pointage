@@ -23,6 +23,7 @@ import com.lykos.pointage.databinding.ActivityExpensesBinding
 import com.lykos.pointage.databinding.DialogAddExpenseBinding
 import com.lykos.pointage.model.ExpenseItemRequest
 import com.lykos.pointage.model.ExpenseResponse
+import com.lykos.pointage.utils.PreferencesManager
 import com.lykos.pointage.viewmodel.ExpenseViewModel
 import java.io.File
 import java.io.FileOutputStream
@@ -44,6 +45,9 @@ class ExpensesActivity : AppCompatActivity() {
     // Prevent toast spam
     private var lastToastTime = 0L
     private var currentToast: Toast? = null
+
+    private lateinit var userID: String
+    private lateinit var preferencesManager: PreferencesManager
 
     // Activity result launchers
     private val cameraLauncher = registerForActivityResult(
@@ -76,7 +80,9 @@ class ExpensesActivity : AppCompatActivity() {
         binding = ActivityExpensesBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        Log.d("MainActivity", "onCreate started")
+        preferencesManager = PreferencesManager(this)
+
+        userID = preferencesManager.getCurrentUserId().toString()
 
         setupRecyclerView()
         setupFAB()
@@ -85,7 +91,6 @@ class ExpensesActivity : AppCompatActivity() {
         // Load initial data
         viewModel.loadUserExpenses(userId)
 
-        Log.d("MainActivity", "onCreate completed")
     }
 
     private fun setupRecyclerView() {

@@ -118,10 +118,11 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         // Initialize core components
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         geofenceManager = GeofenceManager(this)
+        preferencesManager = PreferencesManager(this)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         database = (application as GeofenceMapApplication).database
 
-        userID = "01987620-49fa-7398-8ce6-17b887e206dd"
+        userID = preferencesManager.getCurrentUserId().toString()
 
         viewModel.updateTrackingState(false)
         viewModel.updateInsideGeofenceState()
@@ -300,7 +301,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         binding.btnDepend.setOnClickListener {
-            startActivity(Intent(this, ExpensesActivity::class.java))
+            startActivity(Intent(this, SignInActivity::class.java))
         }
 
     }

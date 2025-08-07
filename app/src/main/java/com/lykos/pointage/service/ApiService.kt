@@ -24,6 +24,7 @@ import retrofit2.http.GET
 import retrofit2.http.Headers
 import retrofit2.http.PUT
 import retrofit2.http.Query
+import retrofit2.http.Url
 
 interface ApiService {
     @Multipart
@@ -46,9 +47,9 @@ interface ApiService {
         @Part("note") note: RequestBody
     ): Response<PvReportResponse>
 
-    @POST("apilogin")
+    @POST
     @Headers("Accept: application/json")
-    suspend fun login(@Body loginRequest: LoginData): Response<LoginResponse>
+    suspend fun login(@Url url: String, @Body loginRequest: LoginData): Response<LoginResponse>
 
     // Create new expense
     @POST("depences/expenses.php")

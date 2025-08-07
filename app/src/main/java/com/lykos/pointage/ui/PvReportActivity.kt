@@ -10,6 +10,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.lykos.pointage.R
 import com.lykos.pointage.service.RetrofitClient
+import com.lykos.pointage.utils.GeofenceManager
+import com.lykos.pointage.utils.PreferencesManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -19,16 +21,18 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class PvReportActivity : AppCompatActivity() {
 
     private lateinit var userID: String
-
+    private lateinit var preferencesManager: PreferencesManager
     private lateinit var editTextNote: EditText
     private lateinit var buttonNext: Button
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_pv_report)
+        preferencesManager = PreferencesManager(this)
 
-        userID = "01987620-49fa-7398-8ce6-17b887e206dd"
+        userID = preferencesManager.getCurrentUserId().toString()
 
         editTextNote = findViewById(R.id.editTextPvNote)
         buttonNext = findViewById(R.id.buttonSubmit)

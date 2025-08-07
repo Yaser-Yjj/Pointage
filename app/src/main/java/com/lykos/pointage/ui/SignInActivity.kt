@@ -3,6 +3,7 @@ package com.lykos.pointage.ui
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
@@ -17,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.content.edit
+import com.lykos.pointage.utils.PreferencesManager
 
 class SignInActivity : AppCompatActivity() {
 
@@ -26,12 +28,14 @@ class SignInActivity : AppCompatActivity() {
     private lateinit var signInButton: Button
     private lateinit var forgotPasswordText: TextView
     private lateinit var createAccountText: TextView
+    private lateinit var preferencesManager: PreferencesManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_sign_in)
 
-        // Bind views
+        preferencesManager = PreferencesManager(this)
+
         emailOrUsernameInput = findViewById(R.id.emailOrUsernameInput)
         passwordInput = findViewById(R.id.passwordInput)
         passwordVisibilityToggle = findViewById(R.id.passwordVisibilityToggle)
@@ -39,16 +43,14 @@ class SignInActivity : AppCompatActivity() {
         forgotPasswordText = findViewById(R.id.forgotPasswordText)
         createAccountText = findViewById(R.id.createAccountText)
 
-        // Toggle password visibility
         setupPasswordToggle()
 
-        // Click listeners
         signInButton.setOnClickListener { attemptLogin() }
         forgotPasswordText.setOnClickListener {
             Toast.makeText(this, "Forgot Password feature coming soon", Toast.LENGTH_SHORT).show()
         }
         createAccountText.setOnClickListener {
-            Toast.makeText(this, "Account creation not available", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Please contact your administrator to create an account for you.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -59,10 +61,10 @@ class SignInActivity : AppCompatActivity() {
         passwordVisibilityToggle.setOnClickListener {
             isPasswordVisible = !isPasswordVisible
             if (isPasswordVisible) {
-                passwordInput.inputType = 1 // textVisiblePassword
+                passwordInput.inputType = 1
                 passwordVisibilityToggle.setImageResource(R.drawable.eye_open)
             } else {
-                passwordInput.inputType = 0x81  // textPassword
+                passwordInput.inputType = 0x81
                 passwordVisibilityToggle.setImageResource(R.drawable.eye_slash)
             }
             passwordInput.setSelection(passwordInput.text.length)
@@ -74,7 +76,6 @@ class SignInActivity : AppCompatActivity() {
         val username = emailOrUsernameInput.text.toString().trim()
         val password = passwordInput.text.toString().trim()
 
-        // Validate input
         if (username.isEmpty()) {
             emailOrUsernameInput.error = "Username is required"
             emailOrUsernameInput.requestFocus()
@@ -86,44 +87,48 @@ class SignInActivity : AppCompatActivity() {
             return
         }
 
-        // Disable button during login
         signInButton.isEnabled = false
         signInButton.text = "Signing in..."
 
-        // Launch login request
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val loginRequest = LoginData(username, password)
-                val response = RetrofitClient.apiService.login(loginRequest)
+                val dynamicUrl = "https://boombatours.com/pointage_app/public/api/userlogin"
+                val response = RetrofitClient.apiService.login(dynamicUrl, loginRequest)
 
                 withContext(Dispatchers.Main) {
                     signInButton.isEnabled = true
                     signInButton.text = "Sign In"
 
-                    if (response.isSuccessful && response.body()?.userId != null) {
-                        val userId = response.body()?.userId!!
-                        Toast.makeText(this@SignInActivity, "Login successful!", Toast.LENGTH_SHORT).show()
+                    if (response.isSuccessful) {
+                        val body = response.body()
+                        val userId = body?.userId
+                        Log.d("Login System", "attemptLogin: $userId ")
+                        if (!userId.isNullOrEmpty()) {
+                            Toast.makeText(this@SignInActivity, "Login successful!", Toast.LENGTH_SHORT).show()
 
-                        getSharedPreferences("AppPrefs", MODE_PRIVATE)
-                            .edit {
-                                putString("user_id", userId)
-                            }
+                            preferencesManager.saveCurrentUserId(userId)
 
-                        // Go to MainActivity
-                        val intent = Intent(this@SignInActivity, MainActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                        finish()
+                            val intent = Intent(this@SignInActivity, MainActivity::class.java)
+                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            startActivity(intent)
+                            finish()
+                        } else {
+                            Toast.makeText(this@SignInActivity, "Invalid response from server", Toast.LENGTH_LONG).show()
+                        }
                     } else {
                         val errorMsg = response.body()?.message ?: "Invalid username or password"
                         Toast.makeText(this@SignInActivity, errorMsg, Toast.LENGTH_LONG).show()
                     }
+
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     signInButton.isEnabled = true
                     signInButton.text = "Sign In"
-                    Toast.makeText(this@SignInActivity, "Network error: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this@SignInActivity, "Network error: ${e.message}", Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }

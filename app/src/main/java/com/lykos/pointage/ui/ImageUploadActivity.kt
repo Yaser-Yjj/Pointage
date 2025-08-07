@@ -23,6 +23,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.lykos.pointage.R
 import com.lykos.pointage.adapter.ImageAdapter
 import com.lykos.pointage.service.RetrofitClient
+import com.lykos.pointage.utils.PreferencesManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -40,8 +41,8 @@ class ImageUploadActivity : AppCompatActivity() {
     private lateinit var buttonSend: Button
     private lateinit var imageAdapter: ImageAdapter
     private val selectedImageUris = mutableListOf<Uri>()
-
     private lateinit var userID: String
+    private lateinit var preferencesManager: PreferencesManager
 
 
     private val requestPermissionsLauncher = registerForActivityResult(
@@ -121,8 +122,10 @@ class ImageUploadActivity : AppCompatActivity() {
         recyclerView = findViewById(R.id.recyclerViewImages)
         buttonAdd = findViewById(R.id.buttonAddImage)
         buttonSend = findViewById(R.id.buttonSendReport)
+        preferencesManager = PreferencesManager(this)
 
-        userID = "01987620-49fa-7398-8ce6-17b887e206dd"
+        userID = preferencesManager.getCurrentUserId().toString()
+
         val note = intent.getStringExtra("report_text") ?: ""
 
         imageAdapter = ImageAdapter(selectedImageUris) { uri ->
@@ -175,25 +178,28 @@ class ImageUploadActivity : AppCompatActivity() {
 
 
                 val response = RetrofitClient.apiService.uploadReport(
-                    userIdPart,
-                    reportTextPart,
-                    imageParts
+                    userIdPart, reportTextPart, imageParts
                 )
 
                 withContext(Dispatchers.Main) {
                     if (response.isSuccessful && response.body()?.success == true) {
-                        Toast.makeText(this@ImageUploadActivity, "✅ Report sent!", Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            this@ImageUploadActivity, "✅ Report sent!", Toast.LENGTH_LONG
+                        ).show()
                         selectedImageUris.clear()
                         imageAdapter.notifyDataSetChanged()
                         finishAffinity()
                     } else {
                         val errorMsg = response.body()?.message ?: "Upload failed"
-                        Toast.makeText(this@ImageUploadActivity, "❌ $errorMsg", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@ImageUploadActivity, "❌ $errorMsg", Toast.LENGTH_LONG)
+                            .show()
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@ImageUploadActivity, "🌐 Network error: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this@ImageUploadActivity, "🌐 Network error: ${e.message}", Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }
@@ -262,16 +268,13 @@ class ImageUploadActivity : AppCompatActivity() {
     }
 
     private fun showImageSourceDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Add Image")
+        AlertDialog.Builder(this).setTitle("Add Image")
             .setItems(arrayOf("Gallery", "Camera")) { _, which ->
                 when (which) {
                     0 -> openGallery()
                     1 -> openCamera()
                 }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+            }.setNegativeButton("Cancel", null).show()
     }
 
     private fun openGallery() {
@@ -285,9 +288,7 @@ class ImageUploadActivity : AppCompatActivity() {
             // Create a file to save the image
             val photoFile = File(cacheDir, "camera_photo_${System.currentTimeMillis()}.jpg")
             currentCameraPhotoUri = FileProvider.getUriForFile(
-                this,
-                "com.lykos.pointage.fileprovider",
-                photoFile
+                this, "com.lykos.pointage.fileprovider", photoFile
             )
 
             intent.putExtra(MediaStore.EXTRA_OUTPUT, currentCameraPhotoUri)
