@@ -26,15 +26,6 @@ data class CreateExpenseRequest(
     val items: List<ExpenseItemRequest>
 )
 
-// Update Expense Request
-data class UpdateExpenseRequest(
-    @SerializedName("id")
-    val id: String,
-    
-    @SerializedName("items")
-    val items: List<ExpenseItemRequest>
-)
-
 // Expense Item Request
 data class ExpenseItemRequest(
     @SerializedName("note")
@@ -80,36 +71,6 @@ data class ExpenseItemResponse(
     val image: String
 )
 
-// Expenses List Response
-data class ExpensesListResponse(
-    @SerializedName("expenses")
-    val expenses: List<ExpenseResponse>,
-    
-    @SerializedName("total_count")
-    val totalCount: Int,
-    
-    @SerializedName("total_amount")
-    val totalAmount: Float,
-    
-    @SerializedName("pagination")
-    val pagination: PaginationResponse? = null
-)
-
-// Pagination Response
-data class PaginationResponse(
-    @SerializedName("current_page")
-    val currentPage: Int,
-    
-    @SerializedName("per_page")
-    val perPage: Int,
-    
-    @SerializedName("total_records")
-    val totalRecords: Int,
-    
-    @SerializedName("total_pages")
-    val totalPages: Int
-)
-
 // Image Upload Response
 data class ImageUploadResponse(
     @SerializedName("filename")
@@ -123,44 +84,4 @@ data class ImageUploadResponse(
     
     @SerializedName("size")
     val size: Long
-)
-
-// Expense Statistics Response
-data class ExpenseStatsResponse(
-    @SerializedName("period")
-    val period: String,
-    
-    @SerializedName("summary")
-    val summary: ExpenseStatsSummary,
-    
-    @SerializedName("monthly_breakdown")
-    val monthlyBreakdown: List<MonthlyStats>
-)
-
-data class ExpenseStatsSummary(
-    @SerializedName("total_expenses")
-    val totalExpenses: Int,
-    
-    @SerializedName("total_amount")
-    val totalAmount: Float,
-    
-    @SerializedName("average_amount")
-    val averageAmount: Float,
-    
-    @SerializedName("min_amount")
-    val minAmount: Float,
-    
-    @SerializedName("max_amount")
-    val maxAmount: Float
-)
-
-data class MonthlyStats(
-    @SerializedName("month")
-    val month: String,
-    
-    @SerializedName("expense_count")
-    val expenseCount: Int,
-    
-    @SerializedName("total_amount")
-    val totalAmount: Float
 )

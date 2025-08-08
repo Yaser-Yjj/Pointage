@@ -2,110 +2,106 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/rootCoordinator"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".ui.ExpensesActivity">
 
     <LinearLayout
+        android:id="@+id/contentContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Toolbar -->
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="?attr/colorPrimary"
             android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-            app:title="Expense Tracker"
-            android:paddingVertical="10dp"
+            app:title="Add Expense"
             app:titleTextColor="@android:color/white" />
 
-        <!-- Main Content with Swipe Refresh -->
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-            android:id="@+id/swipeRefresh"
+        <ScrollView
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <FrameLayout
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent">
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
 
-                <!-- Progress Bar -->
-                <ProgressBar
-                    android:id="@+id/progressBar"
-                    android:layout_width="wrap_content"
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:visibility="gone"
-                    tools:visibility="visible" />
+                    android:hint="note"
+                    app:boxStrokeColor="?attr/colorPrimary"
+                    app:hintTextColor="?attr/colorPrimary"
+                    android:layout_marginBottom="16dp">
 
-                <!-- RecyclerView -->
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recyclerViewExpenses"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:padding="16dp"
-                    android:clipToPadding="false"
-                    android:scrollbars="vertical"
-                    tools:listitem="@layout/item_expense" />
-
-                <!-- Empty State -->
-                <LinearLayout
-                    android:id="@+id/emptyStateLayout"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:padding="32dp"
-                    android:visibility="gone"
-                    tools:visibility="visible">
-
-                    <ImageView
-                        android:layout_width="120dp"
-                        android:layout_height="120dp"
-                        android:src="@drawable/ic_empty_expenses"
-                        android:alpha="0.6"
-                        android:layout_marginBottom="24dp"
-                        android:contentDescription="No expenses" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editTextNote"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="No expenses yet"
-                        android:textSize="18sp"
-                        android:textColor="@android:color/darker_gray"
-                        android:gravity="center"
-                        android:layout_marginBottom="8dp" />
+                        android:inputType="text"
+                        android:maxLines="3" />
+                </com.google.android.material.textfield.TextInputLayout>
 
-                    <TextView
-                        android:layout_width="wrap_content"
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="amount (Dh)"
+                    app:boxStrokeColor="?attr/colorPrimary"
+                    app:hintTextColor="?attr/colorPrimary"
+                    android:layout_marginBottom="16dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editTextPrice"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Tap the + button to add a new expense"
-                        android:textSize="14sp"
-                        android:textColor="@android:color/darker_gray"
-                        android:gravity="center" />
+                        android:inputType="numberDecimal" />
+                </com.google.android.material.textfield.TextInputLayout>
 
-                </LinearLayout>
+                <Button
+                    android:id="@+id/buttonSelectImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Add Receipt"
+                    android:drawableStart="@drawable/ic_image"
+                    android:drawablePadding="8dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_marginBottom="12dp" />
 
-            </FrameLayout>
+                <ImageView
+                    android:id="@+id/imagePreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="180dp"
+                    android:scaleType="centerCrop"
+                    android:adjustViewBounds="true"
+                    android:visibility="gone"
+                    android:contentDescription="Receipt preview"
+                    tools:visibility="visible"
+                    tools:src="@drawable/ic_empty_expenses"
+                    android:layout_marginBottom="16dp" />
 
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/buttonCreateExpense"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Save Expense"/>
 
+            </LinearLayout>
+        </ScrollView>
     </LinearLayout>
 
-    <!-- Floating Action Button -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabAddExpense"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
-        android:src="@drawable/ic_add"
-        android:contentDescription="Add expense"
-        app:tint="@android:color/white"
-        app:backgroundTint="?attr/colorPrimary" />
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleLarge"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="center"
+        android:visibility="gone" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

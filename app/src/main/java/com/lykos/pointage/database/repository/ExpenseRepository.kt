@@ -37,33 +37,6 @@ class ExpenseRepository(private val context: Context) {
         }
     }
 
-    suspend fun getAllUserExpenses(userId: String): Result<List<ExpenseResponse>> =
-        withContext(Dispatchers.IO) {
-            try {
-                var currentPage = 1
-                var allExpenses = mutableListOf<ExpenseResponse>()
-                var totalPages = 1
-
-                do {
-                    val response = apiService.getUserExpenses(userId)
-                    if (!response.isSuccessful || !response.body()?.success!!) {
-                        val errorMsg = response.body()?.message ?: "Failed to fetch page $currentPage"
-                        return@withContext Result.failure(Exception(errorMsg))
-                    }
-
-                    val data = response.body()?.data ?: break
-                    allExpenses.addAll(data.expenses)
-
-                    totalPages = data.pagination?.totalPages ?: 1
-                    currentPage++
-                } while (currentPage <= totalPages)
-
-                Result.success(allExpenses)
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
-        }
-
     suspend fun uploadImage(imageUri: Uri): Result<ImageUploadResponse> = withContext(Dispatchers.IO) {
         try {
             val imageFile = FileUtils.getFileFromUri(context, imageUri)
@@ -80,62 +53,6 @@ class ExpenseRepository(private val context: Context) {
                 } ?: Result.failure(Exception("No data received"))
             } else {
                 val errorMessage = response.body()?.message ?: "Failed to upload image"
-                Result.failure(Exception(errorMessage))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun updateExpense(
-        expenseId: String,
-        items: List<ExpenseItemRequest>
-    ): Result<ExpenseResponse> = withContext(Dispatchers.IO) {
-        try {
-            val request = UpdateExpenseRequest(expenseId, items)
-            val response = apiService.updateExpense(request)
-            
-            if (response.isSuccessful && response.body()?.success == true) {
-                response.body()?.data?.let { data ->
-                    Result.success(data)
-                } ?: Result.failure(Exception("No data received"))
-            } else {
-                val errorMessage = response.body()?.message ?: "Failed to update expense"
-                Result.failure(Exception(errorMessage))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun deleteExpense(expenseId: String): Result<Boolean> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.deleteExpense(expenseId)
-            
-            if (response.isSuccessful && response.body()?.success == true) {
-                Result.success(true)
-            } else {
-                val errorMessage = response.body()?.message ?: "Failed to delete expense"
-                Result.failure(Exception(errorMessage))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun getExpenseStats(
-        userId: String,
-        period: String = "month"
-    ): Result<ExpenseStatsResponse> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getExpenseStats(userId, true, period)
-            
-            if (response.isSuccessful && response.body()?.success == true) {
-                response.body()?.data?.let { data ->
-                    Result.success(data)
-                } ?: Result.failure(Exception("No data received"))
-            } else {
-                val errorMessage = response.body()?.message ?: "Failed to fetch statistics"
                 Result.failure(Exception(errorMessage))
             }
         } catch (e: Exception) {
