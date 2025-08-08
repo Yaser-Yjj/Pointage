@@ -59,17 +59,17 @@ interface ApiService {
 
     // Get user expenses
     @GET("depences/expenses.php")
-    suspend fun getUserExpenses(
+    suspend fun getExpense(
         @Query("user_id") userId: String,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20
-    ): Response<ApiResponse<ExpensesListResponse>>
+    ): Response<ApiResponse<ExpenseResponse>>
 
     // Get single expense
     @GET("depences/expenses.php")
-    suspend fun getExpense(
+    suspend fun getUserExpenses(
         @Query("id") expenseId: String
-    ): Response<ApiResponse<ExpenseResponse>>
+    ): Response<ApiResponse<ExpensesListResponse>>
 
     // Update expense
     @PUT("depences/expenses.php")

@@ -37,26 +37,32 @@ class ExpenseRepository(private val context: Context) {
         }
     }
 
-    suspend fun getUserExpenses(
-        userId: String,
-        page: Int = 1,
-        limit: Int = 20
-    ): Result<ExpensesListResponse> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getUserExpenses(userId, page, limit)
-            
-            if (response.isSuccessful && response.body()?.success == true) {
-                response.body()?.data?.let { data ->
-                    Result.success(data)
-                } ?: Result.failure(Exception("No data received"))
-            } else {
-                val errorMessage = response.body()?.message ?: "Failed to fetch expenses"
-                Result.failure(Exception(errorMessage))
+    suspend fun getAllUserExpenses(userId: String): Result<List<ExpenseResponse>> =
+        withContext(Dispatchers.IO) {
+            try {
+                var currentPage = 1
+                var allExpenses = mutableListOf<ExpenseResponse>()
+                var totalPages = 1
+
+                do {
+                    val response = apiService.getUserExpenses(userId)
+                    if (!response.isSuccessful || !response.body()?.success!!) {
+                        val errorMsg = response.body()?.message ?: "Failed to fetch page $currentPage"
+                        return@withContext Result.failure(Exception(errorMsg))
+                    }
+
+                    val data = response.body()?.data ?: break
+                    allExpenses.addAll(data.expenses)
+
+                    totalPages = data.pagination?.totalPages ?: 1
+                    currentPage++
+                } while (currentPage <= totalPages)
+
+                Result.success(allExpenses)
+            } catch (e: Exception) {
+                Result.failure(e)
             }
-        } catch (e: Exception) {
-            Result.failure(e)
         }
-    }
 
     suspend fun uploadImage(imageUri: Uri): Result<ImageUploadResponse> = withContext(Dispatchers.IO) {
         try {

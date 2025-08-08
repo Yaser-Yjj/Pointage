@@ -81,6 +81,8 @@ dependencies {
 
     // RecyclerView
     implementation (libs.androidx.recyclerview)
+    implementation(libs.androidx.swiperefreshlayout)
+
     // CardView
     implementation (libs.androidx.cardview)
 

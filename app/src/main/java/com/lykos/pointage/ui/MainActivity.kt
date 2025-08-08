@@ -301,9 +301,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         binding.btnDepend.setOnClickListener {
-            startActivity(Intent(this, SignInActivity::class.java))
+            startActivity(Intent(this, ExpensesActivity::class.java))
         }
-
     }
 
     private fun setupButtonSheet() {

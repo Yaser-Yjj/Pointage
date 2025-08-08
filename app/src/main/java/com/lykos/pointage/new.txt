@@ -1,0 +1,488 @@
+<?php
+
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    exit(0);
+}
+
+require_once '../Database/database.php';
+
+class ExpenseAPI {
+    private $conn;
+    private $upload_dir;
+    private $debugLogs = [];
+
+    public function __construct($connection) {
+        $this->conn = $connection;
+        $this->upload_dir = __DIR__ . '/upload/';
+        if (!file_exists($this->upload_dir)) {
+            mkdir($this->upload_dir, 0777, true);
+        }
+    }
+
+    private function addDebug($msg) {
+        $this->debugLogs[] = $msg;
+    }
+
+    public function handleRequest() {
+        $method = $_SERVER['REQUEST_METHOD'];
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+        $path_parts = explode('/', trim($path, '/'));
+
+        try {
+            switch ($method) {
+                case 'POST':
+                    if (end($path_parts) === 'upload-image') {
+                        return $this->uploadImage();
+                    } else {
+                        return $this->createExpense();
+                    }
+                    break;
+
+                case 'GET':
+                    if (isset($_GET['user_id'])) {
+                        return $this->getUserExpenses($_GET['user_id']);
+                    } else {
+                        return $this->getAllExpenses();
+                    }
+                    break;
+
+                case 'PUT':
+                    return $this->updateExpense();
+                    break;
+
+                case 'DELETE':
+                    if (isset($_GET['id'])) {
+                        return $this->deleteExpense($_GET['id']);
+                    }
+                    break;
+
+                default:
+                    return $this->sendResponse(405, false, 'Method not allowed', ['debug' => $this->debugLogs]);
+            }
+        } catch (Exception $e) {
+            $this->addDebug("Server error: " . $e->getMessage());
+            return $this->sendResponse(500, false, 'Server error: ' . $e->getMessage(), ['debug' => $this->debugLogs]);
+        }
+    }
+
+    private function createExpense() {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input) {
+            $this->addDebug("Invalid JSON input");
+            return $this->sendResponse(400, false, 'Invalid JSON input', ['debug' => $this->debugLogs]);
+        }
+        if (!isset($input['user_id']) || !isset($input['items'])) {
+            $this->addDebug("Missing required fields: user_id, items");
+            return $this->sendResponse(400, false, 'Missing required fields: user_id, items', ['debug' => $this->debugLogs]);
+        }
+
+        $user_id = $input['user_id'];
+        $items = $input['items'];
+
+        $this->addDebug("Creating expense for user_id: $user_id with items count: " . count($items));
+
+        if (!$this->isValidUUID($user_id)) {
+            $this->addDebug("Invalid UUID format: " . $user_id);
+            return $this->sendResponse(400, false, 'Invalid user_id format', ['debug' => $this->debugLogs]);
+        }
+        if (!is_array($items) || empty($items)) {
+            $this->addDebug("Items must be a non-empty array");
+            return $this->sendResponse(400, false, 'Items must be a non-empty array', ['debug' => $this->debugLogs]);
+        }
+        foreach ($items as $index => $item) {
+            if (!isset($item['note']) || !isset($item['price'])) {
+                $this->addDebug("Item $index missing required fields: note, price");
+                return $this->sendResponse(400, false, "Item $index missing required fields: note, price", ['debug' => $this->debugLogs]);
+            }
+            if (!is_numeric($item['price']) || $item['price'] < 0) {
+                $this->addDebug("Item $index has invalid price");
+                return $this->sendResponse(400, false, "Item $index has invalid price", ['debug' => $this->debugLogs]);
+            }
+        }
+
+        try {
+            $total_amount = array_sum(array_column($items, 'price'));
+            $sql = "INSERT INTO expenses (user_id, items, total_amount, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())";
+            $stmt = $this->conn->prepare($sql);
+            $items_json = json_encode($items);
+            $stmt->bind_param('ssd', $user_id, $items_json, $total_amount);
+
+            if ($stmt->execute()) {
+                $expense_id = $this->conn->insert_id;
+                $this->addDebug("Expense created with ID: $expense_id");
+
+                $created_expense = $this->getExpenseById($expense_id);
+                return $this->sendResponse(201, true, 'Expense created successfully', ['expense' => $created_expense, 'debug' => $this->debugLogs]);
+            } else {
+                $this->addDebug("Failed to create expense: " . $stmt->error);
+                return $this->sendResponse(500, false, 'Failed to create expense: ' . $stmt->error, ['debug' => $this->debugLogs]);
+            }
+        } catch (Exception $e) {
+            $this->addDebug("Database error on createExpense: " . $e->getMessage());
+            return $this->sendResponse(500, false, 'Database error: ' . $e->getMessage(), ['debug' => $this->debugLogs]);
+        }
+    }
+
+    private function uploadImage() {
+        if (!isset($_FILES['image'])) {
+            $this->addDebug("No image file provided");
+            return $this->sendResponse(400, false, 'No image file provided', ['debug' => $this->debugLogs]);
+        }
+
+        $file = $_FILES['image'];
+        $this->addDebug("Uploading image, file name: " . $file['name']);
+
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            $this->addDebug("File upload error code: " . $file['error']);
+            return $this->sendResponse(400, false, 'File upload error: ' . $this->getUploadErrorMessage($file['error']), ['debug' => $this->debugLogs]);
+        }
+
+        if ($file['size'] > 5 * 1024 * 1024) {
+            $this->addDebug("File too large: " . $file['size'] . " bytes");
+            return $this->sendResponse(400, false, 'File too large. Maximum size is 5MB', ['debug' => $this->debugLogs]);
+        }
+
+        $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime_type = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+
+        if (!in_array($mime_type, $allowed_types)) {
+            $this->addDebug("Invalid file type: " . $mime_type);
+            return $this->sendResponse(400, false, 'Invalid file type. Only JPEG, PNG, and GIF are allowed', ['debug' => $this->debugLogs]);
+        }
+
+        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $filename = 'receipt_' . time() . '_' . uniqid() . '.' . $extension;
+        $filepath = $this->upload_dir . $filename;
+
+        if (move_uploaded_file($file['tmp_name'], $filepath)) {
+            $this->resizeImage($filepath, 800, 600);
+            $this->addDebug("Image uploaded successfully: $filename");
+
+            return $this->sendResponse(200, true, 'Image uploaded successfully', [
+                'filename' => $filename,
+                'path' => 'upload/' . $filename,
+                'url' => 'https://boombatours.com/Pointage_API/depences/upload/' . $filename,
+                'size' => filesize($filepath),
+                'debug' => $this->debugLogs
+            ]);
+        } else {
+            $this->addDebug("Failed to save uploaded file");
+            return $this->sendResponse(500, false, 'Failed to save uploaded file', ['debug' => $this->debugLogs]);
+        }
+    }
+
+    private function getUserExpenses($user_id) {
+        $this->addDebug("Fetching expenses for user_id: " . $user_id);
+        if (!$this->isValidUUID($user_id)) {
+            $this->addDebug("Invalid UUID format: " . $user_id);
+            return $this->sendResponse(400, false, 'Invalid user_id format', ['debug' => $this->debugLogs]);
+        }
+
+        try {
+            $sql = "SELECT * FROM expenses WHERE user_id = ? ORDER BY created_at DESC";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bind_param('s', $user_id);
+            $stmt->execute();
+
+            $result = $stmt->get_result();
+            $expenses = [];
+            $total_amount = 0;
+
+            while ($row = $result->fetch_assoc()) {
+                $row['items'] = json_decode($row['items'], true);
+                $expenses[] = $row;
+                $total_amount += floatval($row['total_amount']);
+            }
+
+            $this->addDebug("Expenses fetched count: " . count($expenses));
+            $this->addDebug("Total amount calculated: " . $total_amount);
+
+            return $this->sendResponse(200, true, 'Expenses retrieved successfully', [
+                'expenses' => $expenses,
+                'total_count' => count($expenses),
+                'total_amount' => $total_amount,
+                'debug' => $this->debugLogs
+            ]);
+        } catch (Exception $e) {
+            $this->addDebug("ðŸ›‘ Error fetching expenses: " . $e->getMessage());
+            return $this->sendResponse(500, false, 'Database error: ' . $e->getMessage(), ['debug' => $this->debugLogs]);
+        }
+    }
+
+    private function getAllExpenses() {
+        $this->addDebug("Fetching all expenses with pagination");
+        try {
+            $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+            $limit = isset($_GET['limit']) ? max(1, min(100, intval($_GET['limit']))) : 20;
+            $offset = ($page - 1) * $limit;
+
+            $count_sql = "SELECT COUNT(*) as total FROM expenses";
+            $count_result = $this->conn->query($count_sql);
+            $total_records = $count_result->fetch_assoc()['total'];
+
+            $sql = "SELECT * FROM expenses ORDER BY created_at DESC LIMIT ? OFFSET ?";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bind_param('ii', $limit, $offset);
+            $stmt->execute();
+
+            $result = $stmt->get_result();
+            $expenses = [];
+
+            while ($row = $result->fetch_assoc()) {
+                $row['items'] = json_decode($row['items'], true);
+                $expenses[] = $row;
+            }
+
+            $this->addDebug("Expenses fetched count: " . count($expenses));
+            $this->addDebug("Pagination: page $page, limit $limit, total records $total_records");
+
+            return $this->sendResponse(200, true, 'Expenses retrieved successfully', [
+                'expenses' => $expenses,
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page' => $limit,
+                    'total_records' => $total_records,
+                    'total_pages' => ceil($total_records / $limit)
+                ],
+                'debug' => $this->debugLogs
+            ]);
+        } catch (Exception $e) {
+            $this->addDebug("Database error on getAllExpenses: " . $e->getMessage());
+            return $this->sendResponse(500, false, 'Database error: ' . $e->getMessage(), ['debug' => $this->debugLogs]);
+        }
+    }
+
+    private function updateExpense() {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || !isset($input['id'])) {
+            $this->addDebug("Missing expense ID for update");
+            return $this->sendResponse(400, false, 'Missing expense ID', ['debug' => $this->debugLogs]);
+        }
+
+        $expense_id = $input['id'];
+        $this->addDebug("Updating expense with ID: $expense_id");
+
+        $existing = $this->getExpenseById($expense_id);
+        if (!$existing) {
+            $this->addDebug("Expense not found for ID: $expense_id");
+            return $this->sendResponse(404, false, 'Expense not found', ['debug' => $this->debugLogs]);
+        }
+
+        try {
+            $updates = [];
+            $params = [];
+            $types = '';
+
+            if (isset($input['items'])) {
+                $updates[] = "items = ?";
+                $params[] = json_encode($input['items']);
+                $types .= 's';
+
+                $total_amount = array_sum(array_column($input['items'], 'price'));
+                $updates[] = "total_amount = ?";
+                $params[] = $total_amount;
+                $types .= 'd';
+            }
+
+            $updates[] = "updated_at = NOW()";
+            $params[] = $expense_id;
+            $types .= 's';
+
+            $sql = "UPDATE expenses SET " . implode(', ', $updates) . " WHERE id = ?";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bind_param($types, ...$params);
+
+            if ($stmt->execute()) {
+                $this->addDebug("Expense updated successfully");
+                $updated_expense = $this->getExpenseById($expense_id);
+                return $this->sendResponse(200, true, 'Expense updated successfully', ['expense' => $updated_expense, 'debug' => $this->debugLogs]);
+            } else {
+                $this->addDebug("Failed to update expense");
+                return $this->sendResponse(500, false, 'Failed to update expense', ['debug' => $this->debugLogs]);
+            }
+        } catch (Exception $e) {
+            $this->addDebug("Database error on updateExpense: " . $e->getMessage());
+            return $this->sendResponse(500, false, 'Database error: ' . $e->getMessage(), ['debug' => $this->debugLogs]);
+        }
+    }
+
+    private function deleteExpense($expense_id) {
+        $this->addDebug("Deleting expense with ID: $expense_id");
+
+        $existing = $this->getExpenseById($expense_id);
+        if (!$existing) {
+            $this->addDebug("Expense not found for deletion: $expense_id");
+            return $this->sendResponse(404, false, 'Expense not found', ['debug' => $this->debugLogs]);
+        }
+
+        try {
+            if (isset($existing['items'])) {
+                foreach ($existing['items'] as $item) {
+                    if (!empty($item['image'])) {
+                        $image_path = $this->upload_dir . basename($item['image']);
+                        if (file_exists($image_path)) {
+                            unlink($image_path);
+                            $this->addDebug("Deleted image file: " . $image_path);
+                        }
+                    }
+                }
+            }
+
+            $sql = "DELETE FROM expenses WHERE id = ?";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bind_param('s', $expense_id);
+
+            if ($stmt->execute()) {
+                $this->addDebug("Expense deleted successfully");
+                return $this->sendResponse(200, true, 'Expense deleted successfully', ['debug' => $this->debugLogs]);
+            } else {
+                $this->addDebug("Failed to delete expense");
+                return $this->sendResponse(500, false, 'Failed to delete expense', ['debug' => $this->debugLogs]);
+            }
+        } catch (Exception $e) {
+            $this->addDebug("Database error on deleteExpense: " . $e->getMessage());
+            return $this->sendResponse(500, false, 'Database error: ' . $e->getMessage(), ['debug' => $this->debugLogs]);
+        }
+    }
+
+    private function getExpenseById($id) {
+        $sql = "SELECT * FROM expenses WHERE id = ?";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param('s', $id);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        if ($row = $result->fetch_assoc()) {
+            $row['items'] = json_decode($row['items'], true);
+            return $row;
+        }
+
+        return null;
+    }
+
+    private function isValidUUID($uuid) {
+        return preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $uuid);
+    }
+
+    private function resizeImage($filepath, $max_width, $max_height) {
+        $image_info = getimagesize($filepath);
+        if (!$image_info) return false;
+
+        $width = $image_info[0];
+        $height = $image_info[1];
+        $type = $image_info[2];
+
+        if ($width <= $max_width && $height <= $max_height) {
+            return true;
+        }
+
+        $ratio = min($max_width / $width, $max_height / $height);
+        $new_width = intval($width * $ratio);
+        $new_height = intval($height * $ratio);
+
+        switch ($type) {
+            case IMAGETYPE_JPEG:
+                $source = imagecreatefromjpeg($filepath);
+                break;
+            case IMAGETYPE_PNG:
+                $source = imagecreatefrompng($filepath);
+                break;
+            case IMAGETYPE_GIF:
+                $source = imagecreatefromgif($filepath);
+                break;
+            default:
+                return false;
+        }
+
+        $destination = imagecreatetruecolor($new_width, $new_height);
+
+        if ($type == IMAGETYPE_PNG || $type == IMAGETYPE_GIF) {
+            imagealphablending($destination, false);
+            imagesavealpha($destination, true);
+            $transparent = imagecolorallocatealpha($destination, 255, 255, 255, 127);
+            imagefilledrectangle($destination, 0, 0, $new_width, $new_height, $transparent);
+        }
+
+        imagecopyresampled($destination, $source, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
+
+        switch ($type) {
+            case IMAGETYPE_JPEG:
+                imagejpeg($destination, $filepath, 85);
+                break;
+            case IMAGETYPE_PNG:
+                imagepng($destination, $filepath);
+                break;
+            case IMAGETYPE_GIF:
+                imagegif($destination, $filepath);
+                break;
+        }
+
+        imagedestroy($source);
+        imagedestroy($destination);
+
+        return true;
+    }
+
+    private function getUploadErrorMessage($error_code) {
+        $errors = [
+            UPLOAD_ERR_INI_SIZE => 'The uploaded file exceeds the upload_max_filesize directive.',
+            UPLOAD_ERR_FORM_SIZE => 'The uploaded file exceeds the MAX_FILE_SIZE directive.',
+            UPLOAD_ERR_PARTIAL => 'The uploaded file was only partially uploaded.',
+            UPLOAD_ERR_NO_FILE => 'No file was uploaded.',
+            UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder.',
+            UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk.',
+            UPLOAD_ERR_EXTENSION => 'File upload stopped by extension.',
+        ];
+        return $errors[$error_code] ?? 'Unknown upload error.';
+    }
+
+    private function sendResponse($status_code, $success, $message, $data = null) {
+        http_response_code($status_code);
+
+        $response = [
+            'success' => $success,
+            'message' => $message,
+            'timestamp' => date('Y-m-d H:i:s'),
+        ];
+
+        if ($data !== null) {
+            if (isset($data['debug'])) {
+                $debugLogs = $data['debug'];
+                unset($data['debug']);
+                $response['debug'] = $debugLogs;
+            }
+            if (!empty($data)) {
+                $response['data'] = $data;
+            }
+        } else if (!empty($this->debugLogs)) {
+            $response['debug'] = $this->debugLogs;
+        }
+
+        echo json_encode($response, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
+// Initialize and handle request
+try {
+    $api = new ExpenseAPI($conn);
+    $api->handleRequest();
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Server error: ' . $e->getMessage(),
+        'timestamp' => date('Y-m-d H:i:s')
+    ]);
+}

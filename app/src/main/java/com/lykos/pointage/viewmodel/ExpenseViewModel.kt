@@ -13,6 +13,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * ViewModel for managing expense data and business logic.
+ * Handles CRUD operations, image uploads, and data fetching.
+ */
 class ExpenseViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = ExpenseRepository(application)
@@ -44,7 +48,9 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
     // Prevent multiple simultaneous operations
     private var isOperationInProgress = false
 
-    // Create new expense
+    /**
+     * Creates a new expense with the given items
+     */
     fun createExpense(userId: String, items: List<ExpenseItemRequest>) {
         if (isOperationInProgress) {
             Log.w("ExpenseViewModel", "Operation already in progress, ignoring create expense")
@@ -55,7 +61,6 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
             try {
                 isOperationInProgress = true
                 _isLoading.postValue(true)
-
                 Log.d("ExpenseViewModel", "Creating expense for user: $userId")
 
                 val result = withContext(Dispatchers.IO) {
@@ -64,16 +69,17 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
 
                 result.onSuccess { expense ->
                     Log.d("ExpenseViewModel", "Expense created successfully: ${expense.id}")
-                    _successMessage.postValue("تم إضافة المصروف بنجاح")
-                    loadUserExpenses(userId) // Refresh the list
+                    _successMessage.postValue("Expense added successfully")
+                    // Force refresh the list after successful creation
+                    _expenses.postValue(emptyList()) // Clear current list first
+                    loadUserExpenses(userId) // Then reload
                 }.onFailure { exception ->
                     Log.e("ExpenseViewModel", "Failed to create expense", exception)
-                    _errorMessage.postValue(exception.message ?: "خطأ في إضافة المصروف")
+                    _errorMessage.postValue(exception.message ?: "Failed to add expense")
                 }
-
             } catch (e: Exception) {
                 Log.e("ExpenseViewModel", "Exception in createExpense", e)
-                _errorMessage.postValue("خطأ غير متوقع في إضافة المصروف")
+                _errorMessage.postValue("Unexpected error adding expense")
             } finally {
                 _isLoading.postValue(false)
                 isOperationInProgress = false
@@ -81,38 +87,40 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Load user expenses
-    fun loadUserExpenses(userId: String, page: Int = 1) {
-        if (isOperationInProgress) {
-            Log.w("ExpenseViewModel", "Operation already in progress, ignoring load expenses")
-            return
-        }
-
+    /**
+     * Loads all expenses for a user (fixed to load all pages if needed)
+     */
+    fun loadUserExpenses(userId: String) {
+        if (isOperationInProgress) return
         viewModelScope.launch {
             try {
                 isOperationInProgress = true
                 _isLoading.postValue(true)
-
-                Log.d("ExpenseViewModel", "Loading expenses for user: $userId")
+                Log.d("ExpenseViewModel", "Loading ALL expenses for user: $userId")
 
                 val result = withContext(Dispatchers.IO) {
-                    repository.getUserExpenses(userId, page)
+                    repository.getAllUserExpenses(userId)
                 }
 
-                result.onSuccess { response ->
-                    Log.d("ExpenseViewModel", "Loaded ${response.expenses.size} expenses")
-                    _expenses.postValue(response.expenses)
+                result.onSuccess { expenses ->
+                    Log.d("ExpenseViewModel", "Loaded ${expenses.size} total expenses")
+                    // Force UI update by posting to main thread
+                    withContext(Dispatchers.Main) {
+                        _expenses.value = expenses
+                    }
                 }.onFailure { exception ->
-                    Log.e("ExpenseViewModel", "Failed to load expenses", exception)
-                    _errorMessage.postValue(exception.message ?: "خطأ في جلب المصاريف")
-                    // Set empty list on error to prevent UI issues
-                    _expenses.postValue(emptyList())
+                    Log.e("ExpenseViewModel", "Failed to load all expenses", exception)
+                    _errorMessage.postValue(exception.message ?: "Failed to load expenses")
+                    withContext(Dispatchers.Main) {
+                        _expenses.value = emptyList()
+                    }
                 }
-
             } catch (e: Exception) {
-                Log.e("ExpenseViewModel", "Exception in loadUserExpenses", e)
-                _errorMessage.postValue("خطأ غير متوقع في جلب المصاريف")
-                _expenses.postValue(emptyList())
+                Log.e("ExpenseViewModel", "Exception in loadAllUserExpenses", e)
+                _errorMessage.postValue("Unexpected error loading expenses")
+                withContext(Dispatchers.Main) {
+                    _expenses.value = emptyList()
+                }
             } finally {
                 _isLoading.postValue(false)
                 isOperationInProgress = false
@@ -120,12 +128,13 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Upload image
+    /**
+     * Uploads an image from URI
+     */
     fun uploadImage(imageUri: Uri) {
         viewModelScope.launch {
             try {
                 _isLoading.postValue(true)
-
                 Log.d("ExpenseViewModel", "Uploading image: $imageUri")
 
                 val result = withContext(Dispatchers.IO) {
@@ -135,27 +144,27 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
                 result.onSuccess { response ->
                     Log.d("ExpenseViewModel", "Image uploaded successfully: ${response.url}")
                     _uploadedImageUrl.postValue(response.url)
-                    _successMessage.postValue("تم رفع الصورة بنجاح")
+                    _successMessage.postValue("Image uploaded successfully")
                 }.onFailure { exception ->
                     Log.e("ExpenseViewModel", "Failed to upload image", exception)
-                    _errorMessage.postValue(exception.message ?: "خطأ في رفع الصورة")
+                    _errorMessage.postValue(exception.message ?: "Failed to upload image")
                 }
-
             } catch (e: Exception) {
                 Log.e("ExpenseViewModel", "Exception in uploadImage", e)
-                _errorMessage.postValue("خطأ غير متوقع في رفع الصورة")
+                _errorMessage.postValue("Unexpected error uploading image")
             } finally {
                 _isLoading.postValue(false)
             }
         }
     }
 
-    // Upload image from file path
+    /**
+     * Uploads an image from file path
+     */
     fun uploadImageFromPath(imagePath: String) {
         viewModelScope.launch {
             try {
                 _isLoading.postValue(true)
-
                 Log.d("ExpenseViewModel", "Uploading image from path: $imagePath")
 
                 val result = withContext(Dispatchers.IO) {
@@ -165,22 +174,23 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
                 result.onSuccess { response ->
                     Log.d("ExpenseViewModel", "Image uploaded successfully: ${response.url}")
                     _uploadedImageUrl.postValue(response.url)
-                    _successMessage.postValue("تم رفع الصورة بنجاح")
+                    _successMessage.postValue("Image uploaded successfully")
                 }.onFailure { exception ->
                     Log.e("ExpenseViewModel", "Failed to upload image", exception)
-                    _errorMessage.postValue(exception.message ?: "خطأ في رفع الصورة")
+                    _errorMessage.postValue(exception.message ?: "Failed to upload image")
                 }
-
             } catch (e: Exception) {
                 Log.e("ExpenseViewModel", "Exception in uploadImageFromPath", e)
-                _errorMessage.postValue("خطأ غير متوقع في رفع الصورة")
+                _errorMessage.postValue("Unexpected error uploading image")
             } finally {
                 _isLoading.postValue(false)
             }
         }
     }
 
-    // Update expense
+    /**
+     * Updates an existing expense
+     */
     fun updateExpense(expenseId: String, items: List<ExpenseItemRequest>, userId: String) {
         if (isOperationInProgress) {
             Log.w("ExpenseViewModel", "Operation already in progress, ignoring update expense")
@@ -191,7 +201,6 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
             try {
                 isOperationInProgress = true
                 _isLoading.postValue(true)
-
                 Log.d("ExpenseViewModel", "Updating expense: $expenseId")
 
                 val result = withContext(Dispatchers.IO) {
@@ -200,16 +209,15 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
 
                 result.onSuccess { expense ->
                     Log.d("ExpenseViewModel", "Expense updated successfully: ${expense.id}")
-                    _successMessage.postValue("تم تحديث المصروف بنجاح")
+                    _successMessage.postValue("Expense updated successfully")
                     loadUserExpenses(userId) // Refresh the list
                 }.onFailure { exception ->
                     Log.e("ExpenseViewModel", "Failed to update expense", exception)
-                    _errorMessage.postValue(exception.message ?: "خطأ في تحديث المصروف")
+                    _errorMessage.postValue(exception.message ?: "Failed to update expense")
                 }
-
             } catch (e: Exception) {
                 Log.e("ExpenseViewModel", "Exception in updateExpense", e)
-                _errorMessage.postValue("خطأ غير متوقع في تحديث المصروف")
+                _errorMessage.postValue("Unexpected error updating expense")
             } finally {
                 _isLoading.postValue(false)
                 isOperationInProgress = false
@@ -217,7 +225,9 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Delete expense
+    /**
+     * Deletes an expense
+     */
     fun deleteExpense(expenseId: String, userId: String) {
         if (isOperationInProgress) {
             Log.w("ExpenseViewModel", "Operation already in progress, ignoring delete expense")
@@ -228,7 +238,6 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
             try {
                 isOperationInProgress = true
                 _isLoading.postValue(true)
-
                 Log.d("ExpenseViewModel", "Deleting expense: $expenseId")
 
                 val result = withContext(Dispatchers.IO) {
@@ -237,16 +246,15 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
 
                 result.onSuccess {
                     Log.d("ExpenseViewModel", "Expense deleted successfully: $expenseId")
-                    _successMessage.postValue("تم حذف المصروف بنجاح")
+                    _successMessage.postValue("Expense deleted successfully")
                     loadUserExpenses(userId) // Refresh the list
                 }.onFailure { exception ->
                     Log.e("ExpenseViewModel", "Failed to delete expense", exception)
-                    _errorMessage.postValue(exception.message ?: "خطأ في حذف المصروف")
+                    _errorMessage.postValue(exception.message ?: "Failed to delete expense")
                 }
-
             } catch (e: Exception) {
                 Log.e("ExpenseViewModel", "Exception in deleteExpense", e)
-                _errorMessage.postValue("خطأ غير متوقع في حذف المصروف")
+                _errorMessage.postValue("Unexpected error deleting expense")
             } finally {
                 _isLoading.postValue(false)
                 isOperationInProgress = false
@@ -254,12 +262,13 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Load expense statistics
+    /**
+     * Loads expense statistics
+     */
     fun loadExpenseStats(userId: String, period: String = "month") {
         viewModelScope.launch {
             try {
                 _isLoading.postValue(true)
-
                 Log.d("ExpenseViewModel", "Loading stats for user: $userId, period: $period")
 
                 val result = withContext(Dispatchers.IO) {
@@ -271,24 +280,27 @@ class ExpenseViewModel(application: Application) : AndroidViewModel(application)
                     _expenseStats.postValue(stats)
                 }.onFailure { exception ->
                     Log.e("ExpenseViewModel", "Failed to load stats", exception)
-                    _errorMessage.postValue(exception.message ?: "خطأ في جلب الإحصائيات")
+                    _errorMessage.postValue(exception.message ?: "Failed to load statistics")
                 }
-
             } catch (e: Exception) {
                 Log.e("ExpenseViewModel", "Exception in loadExpenseStats", e)
-                _errorMessage.postValue("خطأ غير متوقع في جلب الإحصائيات")
+                _errorMessage.postValue("Unexpected error loading statistics")
             } finally {
                 _isLoading.postValue(false)
             }
         }
     }
 
-    // Clear error message
+    /**
+     * Clears error message
+     */
     fun clearErrorMessage() {
         _errorMessage.postValue(null)
     }
 
-    // Clear success message
+    /**
+     * Clears success message
+     */
     fun clearSuccessMessage() {
         _successMessage.postValue(null)
     }

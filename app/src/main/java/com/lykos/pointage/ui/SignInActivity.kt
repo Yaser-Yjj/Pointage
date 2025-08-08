@@ -120,7 +120,6 @@ class SignInActivity : AppCompatActivity() {
                         val errorMsg = response.body()?.message ?: "Invalid username or password"
                         Toast.makeText(this@SignInActivity, errorMsg, Toast.LENGTH_LONG).show()
                     }
-
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {

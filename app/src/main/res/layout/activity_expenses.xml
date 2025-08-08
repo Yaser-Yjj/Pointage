@@ -18,73 +18,81 @@
             android:layout_height="?attr/actionBarSize"
             android:background="?attr/colorPrimary"
             android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-            app:title="متتبع المصاريف"
+            app:title="Expense Tracker"
+            android:paddingVertical="10dp"
             app:titleTextColor="@android:color/white" />
 
-        <!-- Main Content -->
-        <FrameLayout
+        <!-- Main Content with Swipe Refresh -->
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipeRefresh"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <!-- Progress Bar -->
-            <ProgressBar
-                android:id="@+id/progressBar"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:visibility="gone"
-                tools:visibility="visible" />
-
-            <!-- RecyclerView -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recyclerViewExpenses"
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:padding="16dp"
-                android:clipToPadding="false"
-                android:scrollbars="vertical"
-                tools:listitem="@layout/item_expense" />
+                android:layout_height="match_parent">
 
-            <!-- Empty State -->
-            <LinearLayout
-                android:id="@+id/emptyStateLayout"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:padding="32dp"
-                android:visibility="gone"
-                tools:visibility="visible">
-
-                <ImageView
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
-                    android:src="@drawable/ic_empty_expenses"
-                    android:alpha="0.6"
-                    android:layout_marginBottom="24dp"
-                    android:contentDescription="empty state image" />
-
-                <TextView
+                <!-- Progress Bar -->
+                <ProgressBar
+                    android:id="@+id/progressBar"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="لا توجد مصاريف بعد"
-                    android:textSize="18sp"
-                    android:textColor="@android:color/darker_gray"
+                    android:layout_gravity="center"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
+                <!-- RecyclerView -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerViewExpenses"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="16dp"
+                    android:clipToPadding="false"
+                    android:scrollbars="vertical"
+                    tools:listitem="@layout/item_expense" />
+
+                <!-- Empty State -->
+                <LinearLayout
+                    android:id="@+id/emptyStateLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
                     android:gravity="center"
-                    android:layout_marginBottom="8dp" />
+                    android:padding="32dp"
+                    android:visibility="gone"
+                    tools:visibility="visible">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="اضغط على زر + لإضافة مصروف جديد"
-                    android:textSize="14sp"
-                    android:textColor="@android:color/darker_gray"
-                    android:gravity="center" />
+                    <ImageView
+                        android:layout_width="120dp"
+                        android:layout_height="120dp"
+                        android:src="@drawable/ic_empty_expenses"
+                        android:alpha="0.6"
+                        android:layout_marginBottom="24dp"
+                        android:contentDescription="No expenses" />
 
-            </LinearLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="No expenses yet"
+                        android:textSize="18sp"
+                        android:textColor="@android:color/darker_gray"
+                        android:gravity="center"
+                        android:layout_marginBottom="8dp" />
 
-        </FrameLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Tap the + button to add a new expense"
+                        android:textSize="14sp"
+                        android:textColor="@android:color/darker_gray"
+                        android:gravity="center" />
+
+                </LinearLayout>
+
+            </FrameLayout>
+
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     </LinearLayout>
 
@@ -96,7 +104,7 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
         android:src="@drawable/ic_add"
-        android:contentDescription="add expense"
+        android:contentDescription="Add expense"
         app:tint="@android:color/white"
         app:backgroundTint="?attr/colorPrimary" />
 
