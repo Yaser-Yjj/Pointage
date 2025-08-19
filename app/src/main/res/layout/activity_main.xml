@@ -47,7 +47,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp"
-            android:layout_marginTop="30dp"
+            android:layout_marginTop="35dp"
             android:gravity="center"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -130,58 +130,71 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="10dp"
+            android:padding="16dp"
             android:background="@color/white"
             app:layout_constraintBottom_toBottomOf="parent">
 
-            <!-- Action Buttons -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center"
                 android:orientation="horizontal"
-                android:padding="8dp"
-                android:layout_marginTop="16dp">
+                android:gravity="center"
+                android:weightSum="3">
 
-                <!-- Left Button: PV -->
+                <!-- Bouton PV -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnPV"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
+                    android:layout_marginEnd="4dp"
                     android:text="PV"
                     android:textColor="@android:color/white"
+                    android:drawableTop="@drawable/ic_pv"
+                    android:drawablePadding="6dp"
+                    android:padding="12dp"
                     app:backgroundTint="@color/geofence_stroke"
-                    app:cornerRadius="12dp"
-                    app:rippleColor="@android:color/white" />
+                    app:cornerRadius="16dp"
+                    app:rippleColor="#40FFFFFF"
+                    app:strokeColor="#E0E0E0"
+                    app:strokeWidth="1dp" />
 
-                <!-- Middle Button: Report & Images -->
+                <!-- Bouton Rapport & Images -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnReportImages"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginEnd="6dp"
-                    android:text="Rapport &amp; Images"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    android:text="Rapport"
                     android:textColor="@android:color/white"
+                    android:drawableTop="@drawable/ic_report"
+                    android:drawablePadding="6dp"
+                    android:padding="12dp"
                     app:backgroundTint="@color/geofence_stroke"
-                    app:cornerRadius="12dp"
-                    app:rippleColor="@android:color/white" />
+                    app:cornerRadius="16dp"
+                    app:rippleColor="#40FFFFFF"
+                    app:strokeColor="#E0E0E0"
+                    app:strokeWidth="1dp" />
 
-                <!-- Right Button: Intégrer -->
+                <!-- Bouton Contrainte -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnDepend"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="6dp"
+                    android:layout_marginStart="4dp"
                     android:text="Contrainte"
                     android:textColor="@android:color/white"
+                    android:drawableTop="@drawable/ic_constraint"
+                    android:drawablePadding="6dp"
+                    android:padding="12dp"
                     app:backgroundTint="@color/geofence_stroke"
-                    app:cornerRadius="12dp"
-                    app:rippleColor="@android:color/white" />
+                    app:cornerRadius="16dp"
+                    app:rippleColor="#40FFFFFF"
+                    app:strokeColor="#E0E0E0"
+                    app:strokeWidth="1dp" />
 
             </LinearLayout>
         </LinearLayout>
