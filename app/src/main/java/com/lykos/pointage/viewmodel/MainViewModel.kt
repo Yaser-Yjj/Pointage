@@ -1,16 +1,23 @@
 package com.lykos.pointage.viewmodel
 
 import android.app.Application
+import android.content.ContentValues.TAG
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.lykos.pointage.GeofenceMapApplication
 import com.lykos.pointage.database.entity.LocationEvent
-import com.lykos.pointage.model.data.GeofenceData
 import com.lykos.pointage.model.data.GeofencePreferences
+import com.lykos.pointage.model.data.SafeZoneData
 import com.lykos.pointage.utils.PreferencesManager
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -23,153 +30,142 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val database = (application as GeofenceMapApplication).database
     private val preferencesManager = PreferencesManager(application)
 
-    // LiveData for UI state
-    private val _geofenceData = MutableLiveData<GeofenceData?>()
-    val geofenceData: LiveData<GeofenceData?> = _geofenceData
-
+    // 🔷 StateFlows for internal mutable state
+    private val _safeZones = MutableStateFlow<List<SafeZoneData>>(emptyList())
+    private val _selectedZoneIndex = MutableStateFlow(0)
     private val _isTracking = MutableLiveData<Boolean>()
-    val isTracking: LiveData<Boolean> = _isTracking
-
     private val _locationEvents = MutableLiveData<List<LocationEvent>>()
-    val locationEvents: LiveData<List<LocationEvent>> = _locationEvents
-
     private val _totalTimeInside = MutableLiveData<Long>()
-    val totalTimeInside: LiveData<Long> = _totalTimeInside
-
     private val _isInsideGeofence = MutableLiveData<Boolean>()
+
+    // 🔶 Exposed as LiveData (or StateFlow) for UI
+    val safeZones: LiveData<List<SafeZoneData>> = _safeZones.asLiveData()
+    val selectedZoneIndex: LiveData<Int> = _selectedZoneIndex.asLiveData()
+    val isTracking: LiveData<Boolean> = _isTracking
+    val locationEvents: LiveData<List<LocationEvent>> = _locationEvents
+    val totalTimeInside: LiveData<Long> = _totalTimeInside
     val isInsideGeofence: LiveData<Boolean> = _isInsideGeofence
 
+    // 🌟 Derived: Current selected safe zone (modern way)
+    val currentGeofenceData = combine(_safeZones, _selectedZoneIndex) { zones, index ->
+        zones.getOrNull(index)
+    }.distinctUntilChanged().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+    val currentGeofenceDataAsLiveData: LiveData<SafeZoneData?> = currentGeofenceData.asLiveData()
+
     init {
-        loadGeofenceData()
-        loadTrackingState()
+        loadInitialState()
         loadLocationEvents()
         loadStatistics()
     }
 
-    fun updateInsideGeofenceState() {
-        val isOutside = preferencesManager.getState()
-        _isInsideGeofence.value = !isOutside
-    }
-
-    /**
-     * Loads saved geofence configuration from preferences
-     */
-    private fun loadGeofenceData() {
+    private fun loadInitialState() {
         val preferences = preferencesManager.getGeofencePreferences()
-        if (preferences.latitude != 0.0 && preferences.longitude != 0.0) {
-            _geofenceData.value = GeofenceData(
-                latitude = preferences.latitude,
-                longitude = preferences.longitude,
-                radius = preferences.radius,
-                isActive = preferences.isGeofenceActive
+        val zones = if (preferences.latitude != 0.0 && preferences.longitude != 0.0) {
+            listOf(
+                SafeZoneData(
+                    id = 0,
+                    latitude = preferences.latitude,
+                    longitude = preferences.longitude,
+                    radius = preferences.radius
+                )
             )
+        } else {
+            emptyList()
         }
-    }
 
-    /**
-     * Loads current tracking state
-     */
-    private fun loadTrackingState() {
+        _safeZones.value = zones
+        _selectedZoneIndex.value = zones.firstOrNull()?.let { 0 }!!
         _isTracking.value = preferencesManager.isTracking()
+        _isInsideGeofence.value = !preferencesManager.getState()
     }
 
-    /**
-     * Loads location events from database
-     */
-    private fun loadLocationEvents() {
-        viewModelScope.launch {
-            try {
-                val events = database.locationEventDao().getRecentEvents()
-                _locationEvents.value = events
-            } catch (_: Exception) {
-                // Handle error
-                _locationEvents.value = emptyList()
-            }
-        }
-    }
-
-    /**
-     * Loads statistics from database
-     */
-    private fun loadStatistics() {
-        viewModelScope.launch {
-            try {
-                val totalTimeInside = database.locationEventDao().getTotalTimeInside() ?: 0L
-
-                _totalTimeInside.value = totalTimeInside
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Error loading statistics", e)
-                _totalTimeInside.value = 0L
-            }
-        }
-    }
-
-    /**
-     * Saves geofence configuration
-     */
-    fun saveGeofenceData(latitude: Double, longitude: Double, radius: Float) {
-        val geofenceData = GeofenceData(latitude, longitude, radius, true)
-        _geofenceData.value = geofenceData
-
-        val preferences = GeofencePreferences(
-            latitude = latitude,
-            longitude = longitude,
-            radius = radius,
-            isGeofenceActive = false
-        )
-        preferencesManager.saveGeofencePreferences(preferences)
-    }
-
-    /**
-     * Updates geofence active state
-     */
-    fun updateGeofenceActiveState(isActive: Boolean) {
-        val currentData = _geofenceData.value
-        if (currentData != null) {
-            val updatedData = currentData.copy(isActive = isActive)
-            _geofenceData.value = updatedData
-
-            val preferences = GeofencePreferences(
-                latitude = currentData.latitude,
-                longitude = currentData.longitude,
-                radius = currentData.radius,
-                isGeofenceActive = isActive
+    fun setSafeZones(zones: List<SafeZoneData>) {
+        val newZones = zones.map {
+            SafeZoneData(
+                id = it.id,
+                latitude = it.latitude,
+                longitude = it.longitude,
+                radius = it.radius
             )
-            preferencesManager.saveGeofencePreferences(preferences)
+        }
+
+        _safeZones.value = newZones
+        if (newZones.isNotEmpty()) {
+            _selectedZoneIndex.value = 0
         }
     }
 
-    /**
-     * Updates tracking state
-     */
+    fun selectZone(index: Int) {
+        val zones = _safeZones.value
+        if (index in zones.indices) {
+            _selectedZoneIndex.value = index
+        }
+    }
+
+    fun updateInsideGeofenceState() {
+        _isInsideGeofence.value = !preferencesManager.getState()
+    }
+
+    fun saveGeofenceData(latitude: Double, longitude: Double, radius: Float) {
+        val zone = SafeZoneData(
+            id = 0, latitude = latitude, longitude = longitude, radius = radius
+        )
+        setSafeZones(listOf(zone)) // For now — later you might append
+        preferencesManager.saveGeofencePreferences(
+            GeofencePreferences(latitude, longitude, radius, isGeofenceActive = true)
+        )
+    }
+
     fun updateTrackingState(isTracking: Boolean) {
         _isTracking.value = isTracking
         preferencesManager.setTrackingState(isTracking)
     }
 
-    /**
-     * Refreshes data from database
-     */
+    private fun loadLocationEvents() {
+        viewModelScope.launch {
+            runCatching {
+                database.locationEventDao().getRecentEvents()
+            }.onSuccess { events ->
+                _locationEvents.value = events
+            }.onFailure {
+                _locationEvents.value = emptyList()
+            }
+        }
+    }
+
+    private fun loadStatistics() {
+        viewModelScope.launch {
+            runCatching {
+                database.locationEventDao().getTotalTimeInside() ?: 0L
+            }.onSuccess { totalTime ->
+                _totalTimeInside.value = totalTime
+            }.onFailure { e ->
+                // Log if needed
+            }
+        }
+    }
+
     fun refreshData() {
         loadLocationEvents()
         loadStatistics()
-        loadTrackingState()
+        _isTracking.value = preferencesManager.isTracking()
     }
 
-    /**
-     * Clears all data
-     */
     fun clearAllData() {
         viewModelScope.launch {
-            try {
+            runCatching {
                 database.locationEventDao().deleteAllLocationEvents()
                 preferencesManager.clearGeofencePreferences()
 
-                _geofenceData.value = null
-                _isTracking.value = false
                 _locationEvents.value = emptyList()
-            } catch (_: Exception) {
-                // Handle error
+                _totalTimeInside.value = 0L
+                _isTracking.value = false
+                _safeZones.value = emptyList()
+                _selectedZoneIndex.value = 0
             }
         }
     }

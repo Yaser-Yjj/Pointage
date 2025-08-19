@@ -5,6 +5,7 @@ import com.lykos.pointage.model.data.SafeZoneData
 
 data class SafeZoneResponse(
     val success: Boolean,
-    val data: SafeZoneData?,
-    val message: String? = null
+    val message: String?,
+    val count: Int,
+    val data: List<SafeZoneData>
 )

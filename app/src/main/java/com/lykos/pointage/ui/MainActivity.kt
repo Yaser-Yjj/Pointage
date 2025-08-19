@@ -17,6 +17,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.os.Looper
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,6 +42,7 @@ import com.lykos.pointage.GeofenceMapApplication
 import com.lykos.pointage.R
 import com.lykos.pointage.database.GeofenceDatabase
 import com.lykos.pointage.databinding.ActivityMainBinding
+import com.lykos.pointage.model.data.SafeZoneData
 import com.lykos.pointage.service.LocationTrackingService
 import com.lykos.pointage.service.RetrofitClient
 import com.lykos.pointage.utils.GeofenceManager
@@ -65,12 +67,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var userID: String
     private val viewModel: MainViewModel by viewModels()
     private var geofenceCircle: Circle? = null
-    private var geofenceRadius: Float = 100f
     private lateinit var tvStatus: TextView
     private lateinit var preferencesManager: PreferencesManager
     private var timerHandler: android.os.Handler? = null
     private var timerRunnable: Runnable? = null
     private var isTimerRunning = false
+    private lateinit var textCurrentArea: TextView
+    private lateinit var textAreaName: TextView
+    private lateinit var btnPrevArea: ImageButton
+    private lateinit var btnNextArea: ImageButton
 
     private lateinit var database: GeofenceDatabase
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -127,14 +132,13 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         viewModel.updateTrackingState(false)
         viewModel.updateInsideGeofenceState()
 
+        initViews()
         setupToolbar()
         setupMap()
         setupButtons()
         observeViewModel()
         setupButtonSheet()
         navigateToPage()
-        initViews()
-        initPreferences()
 
         requestRequiredPermissionsAndProceed()
     }
@@ -191,7 +195,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun onAllPermissionsAndLocationAvailable() {
         enableMyLocationIfPermitted()
 
-        fetchSafeZone(userId = userID)
+        fetchSafeZones(userId = userID)
         updateTimerDisplay()
 
         Toast.makeText(this, "✅ All permissions granted! Ready to track.", Toast.LENGTH_SHORT)
@@ -202,10 +206,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun initViews() {
         tvStatus = findViewById(R.id.tvStatus)
-    }
-
-    private fun initPreferences() {
-        preferencesManager = PreferencesManager(this)
+        textCurrentArea = binding.textCurrentArea
+        textAreaName = binding.textAreaName
+        btnPrevArea = binding.btnPrevArea
+        btnNextArea = binding.btnNextArea
     }
 
     private fun updateTimerDisplay() {
@@ -311,6 +315,36 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         behavior.peekHeight = 150
         behavior.isHideable = false
         behavior.state = BottomSheetBehavior.STATE_COLLAPSED
+
+        btnNextArea.setOnClickListener {
+            val currentIndex = viewModel.selectedZoneIndex.value ?: 0
+            val zones = viewModel.safeZones.value.orEmpty()
+            val size = zones.size
+
+            Log.d(TAG, "Next | Current: $currentIndex | Size: $size")
+
+            if (size <= 1) return@setOnClickListener
+
+            val newIndex = (currentIndex + 1) % size
+            Log.d(TAG, "Switching to index: $newIndex")
+
+            viewModel.selectZone(newIndex)
+        }
+
+        btnPrevArea.setOnClickListener {
+            val currentIndex = viewModel.selectedZoneIndex.value ?: 0
+            val zones = viewModel.safeZones.value.orEmpty()
+            val size = zones.size
+
+            Log.d(TAG, "Prev | Current: $currentIndex | Size: $size")
+
+            if (size <= 1) return@setOnClickListener
+
+            val newIndex = (currentIndex - 1 + size) % size
+            Log.d(TAG, "Switching to index: $newIndex")
+
+            viewModel.selectZone(newIndex)
+        }
     }
 
     private fun setupToolbar() {
@@ -329,21 +363,23 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     @SuppressLint("SetTextI18n")
     private fun observeViewModel() {
-        viewModel.geofenceData.observe(this) { geofenceData ->
-            geofenceData?.let {
-                geofenceRadius = it.radius
-                if (::googleMap.isInitialized) {
-                    val location = LatLng(it.latitude, it.longitude)
-                    val isInside = viewModel.isInsideGeofence.value ?: true
-                    showGeofenceOnMap(location, geofenceRadius, isInside)
-                    googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, DEFAULT_ZOOM))
-
-                    viewModel.isTracking.value?.let { it1 ->
-                        if (!it1) {
-                            startGeofenceTracking()
-                        }
+        viewModel.safeZones.observe(this) { zones ->
+            if (zones.isEmpty()) {
+                Toast.makeText(this, "No safe zones defined.", Toast.LENGTH_LONG).show()
+            } else {
+                viewModel.isTracking.value?.let {
+                    if (!it) {
+                        startGeofenceTracking()
                     }
                 }
+            }
+        }
+
+        viewModel.currentGeofenceDataAsLiveData.observe(this) { safeZone ->
+            safeZone?.let { zone ->
+                updateMapWithZone(zone)
+                val index = viewModel.selectedZoneIndex.value ?: 0
+                updateCarouselUI(zone, index)
             }
         }
 
@@ -353,6 +389,27 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             }
             updateTimerDisplay()
         }
+    }
+
+    private fun updateMapWithZone(zone: SafeZoneData) {
+        Log.d(TAG, "updateMapWithZone called with radius: ${zone.radius}")
+
+        if (::googleMap.isInitialized) {
+            val location = LatLng(zone.latitude, zone.longitude)
+            showGeofenceOnMap(location, zone.radius, viewModel.isInsideGeofence.value ?: true)
+            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(location, DEFAULT_ZOOM))
+        }
+
+        if (viewModel.isTracking.value == true) {
+            stopGeofenceTracking()
+            startGeofenceTracking()
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun updateCarouselUI(zone: SafeZoneData, index: Int) {
+        textCurrentArea.text = "Area ${index + 1}"
+        textAreaName.text = "Radius: ${zone.radius}m"
     }
 
     private val geofenceStateReceiver = object : BroadcastReceiver() {
@@ -393,44 +450,50 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         enableMyLocationIfPermitted()
 
-        if (viewModel.geofenceData.value == null) {
-            fetchSafeZone(userId = userID)
-        } else {
-            val data = viewModel.geofenceData.value!!
-            val location = LatLng(data.latitude, data.longitude)
-            val isInside = viewModel.isInsideGeofence.value ?: true
-            showGeofenceOnMap(location, data.radius, isInside)
-            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, DEFAULT_ZOOM))
-        }
+        fetchSafeZones(userId = userID)
     }
 
     // MARK: - Geofence & Location
 
-    fun fetchSafeZone(userId: String) {
+    fun fetchSafeZones(userId: String) {
         lifecycleScope.launch {
             try {
-                val response = RetrofitClient.apiService.getSafeZone(userId)
+                val response = RetrofitClient.apiService.getSafeZones(userId)
+                Log.d(TAG, "API Response: $response")
                 if (response.isSuccessful && response.body()?.success == true) {
-                    val zone = response.body()?.data
-                    if (zone != null && zone.latitude != 0.0 && zone.longitude != 0.0) {
-                        viewModel.saveGeofenceData(zone.latitude, zone.longitude, zone.radius)
-                    } else {
+                    val zones = response.body()?.data.orEmpty()
+                    Log.d(TAG, "Fetched zones count: ${zones.size}")
+                    for (zone in zones) {
+                        Log.d(
+                            TAG,
+                            "Zone: lat=${zone.latitude}, lng=${zone.longitude}, radius=${zone.radius}"
+                        )
+                    }
+                    if (zones.isEmpty()) {
                         withContext(Dispatchers.Main) {
                             Toast.makeText(
-                                this@MainActivity, "Invalid safe zone data.", Toast.LENGTH_LONG
+                                this@MainActivity,
+                                "No safe zones found.",
+                                Toast.LENGTH_LONG
                             ).show()
                         }
+                        return@launch
                     }
+
+                    viewModel.setSafeZones(zones)
                 } else {
+                    Log.e(TAG, "API failed: ${response.message()}")
                     withContext(Dispatchers.Main) {
                         Toast.makeText(
-                            this@MainActivity, "Failed to load safe zone.", Toast.LENGTH_LONG
+                            this@MainActivity,
+                            "Failed to load safe zones.",
+                            Toast.LENGTH_LONG
                         ).show()
                     }
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "Network error", e)
                 withContext(Dispatchers.Main) {
-                    Log.e(TAG, "Network error", e)
                     Toast.makeText(this@MainActivity, "Network error.", Toast.LENGTH_LONG).show()
                 }
             }
@@ -451,7 +514,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun startGeofenceTracking() {
-        val geofenceData = viewModel.geofenceData.value
+        val geofenceData = viewModel.currentGeofenceData.value
         if (geofenceData == null || geofenceData.latitude == 0.0) {
             Toast.makeText(this, "Safe zone not set.", Toast.LENGTH_LONG).show()
             return
@@ -482,7 +545,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 ContextCompat.startForegroundService(this, serviceIntent)
                 Toast.makeText(this, "Tracking started!", Toast.LENGTH_SHORT).show()
 
-                // Optional: Check initial location
                 fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                     location?.let {
                         val checkIntent = Intent(this, LocationTrackingService::class.java).apply {
@@ -499,6 +561,37 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 Toast.makeText(this, "Start failed: $error", Toast.LENGTH_LONG).show()
                 viewModel.updateTrackingState(false)
             })
+    }
+
+    private fun stopGeofenceTracking() {
+        viewModel.isTracking.value?.let {
+            if (!it) {
+                Log.d(TAG, "No active tracking to stop.")
+                return
+            }
+        }
+
+        geofenceManager.removeGeofences { success ->
+            lifecycleScope.launch(Dispatchers.Main) {
+                if (success) {
+                    viewModel.updateTrackingState(false)
+                    // Stop the foreground service
+                    val serviceIntent =
+                        Intent(this@MainActivity, LocationTrackingService::class.java).apply {
+                            action = LocationTrackingService.ACTION_STOP_TRACKING
+                        }
+                    stopService(serviceIntent)
+
+                    Toast.makeText(this@MainActivity, "Tracking stopped.", Toast.LENGTH_SHORT)
+                        .show()
+                    Log.d(TAG, "Geofences removed successfully.")
+                } else {
+                    Toast.makeText(this@MainActivity, "Failed to stop tracking.", Toast.LENGTH_LONG)
+                        .show()
+                    Log.e(TAG, "Failed to remove geofences.")
+                }
+            }
+        }
     }
 
     private fun moveToCurrentLocation() {
@@ -680,15 +773,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onResume() {
         super.onResume()
         viewModel.refreshData()
-
-        if (::googleMap.isInitialized) {
-            val geofenceData = viewModel.geofenceData.value
-            if (geofenceData != null) {
-                val location = LatLng(geofenceData.latitude, geofenceData.longitude)
-                val isInside = viewModel.isInsideGeofence.value ?: true
-                showGeofenceOnMap(location, geofenceData.radius, isInside)
-            }
-        }
     }
 
     override fun onDestroy() {

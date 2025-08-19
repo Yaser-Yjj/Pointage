@@ -28,7 +28,7 @@ interface ApiService {
     ): Response<ReportResponse>
 
     @GET("safe-zone")
-    suspend fun getSafeZone(
+    suspend fun getSafeZones(
         @Query("user_id") userId: String
     ): Response<SafeZoneResponse>
 
