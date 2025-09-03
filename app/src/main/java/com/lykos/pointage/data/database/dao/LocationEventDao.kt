@@ -1,7 +1,7 @@
-package com.lykos.pointage.database.dao
+package com.lykos.pointage.data.database.dao
 
 import androidx.room.*
-import com.lykos.pointage.database.entity.LocationEvent
+import com.lykos.pointage.data.database.entity.LocationEvent
 import kotlinx.coroutines.flow.Flow
 
 

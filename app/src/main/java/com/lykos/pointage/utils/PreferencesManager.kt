@@ -2,8 +2,8 @@ package com.lykos.pointage.utils
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.lykos.pointage.model.data.GeofencePreferences
 import androidx.core.content.edit
+import com.lykos.pointage.data.model.data.GeofencePreferences
 
 /**
  * Manages SharedPreferences for geofence configuration
@@ -23,11 +23,21 @@ class PreferencesManager(context: Context) {
         private const val KEY_LAST_EXIT_TIMESTAMP = "last_exit_timestamp"
         private const val KEY_ACCUMULATED_TIME_INSIDE = "accumulated_time_inside"
         private const val KEY_CURRENT_USER_ID = "current_user_id"
+
+        private const val KEY_LAST_GEOFENCE_ID = "last_geofence_id"
     }
 
     private val sharedPrefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+
+    private fun saveLastSelectedGeofence(geofenceId: String) {
+        sharedPrefs.edit { putString(KEY_LAST_GEOFENCE_ID, geofenceId) }
+    }
+
+    private fun getLastSelectedGeofence(): String? {
+        return sharedPrefs.getString(KEY_LAST_GEOFENCE_ID, null)
+    }
 
     fun saveCurrentUserId(userId: String) {
         sharedPrefs.edit { putString(KEY_CURRENT_USER_ID, userId) }

@@ -5,7 +5,7 @@
     android:id="@+id/rootCoordinator"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".ui.ExpensesActivity">
+    tools:context=".ui.view.ExpensesActivity">
 
     <LinearLayout
         android:id="@+id/contentContainer"

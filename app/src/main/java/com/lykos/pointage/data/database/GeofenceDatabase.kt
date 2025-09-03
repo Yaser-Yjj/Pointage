@@ -1,14 +1,14 @@
-package com.lykos.pointage.database
+package com.lykos.pointage.data.database
 
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.lykos.pointage.GeofenceMapApplication
-import com.lykos.pointage.database.dao.DailyInsideTimeDao
-import com.lykos.pointage.database.entity.LocationEvent
-import com.lykos.pointage.database.dao.LocationEventDao
-import com.lykos.pointage.database.entity.DailyInsideTime
+import com.lykos.pointage.data.database.dao.DailyInsideTimeDao
+import com.lykos.pointage.data.database.dao.LocationEventDao
+import com.lykos.pointage.data.database.entity.DailyInsideTime
+import com.lykos.pointage.data.database.entity.LocationEvent
 
 /**
  * Room database for storing geofence events

@@ -57,6 +57,9 @@ dependencies {
     // Lifecycle
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.process)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
 
     // Work Manager (for reliable background tasks)
     implementation(libs.androidx.work.runtime.ktx)

@@ -1,4 +1,4 @@
-package com.lykos.pointage.model.data
+package com.lykos.pointage.data.model.data
 
 class LoginData(
     val username: String,

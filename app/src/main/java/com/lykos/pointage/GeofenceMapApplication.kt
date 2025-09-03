@@ -5,7 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import android.util.Log
-import com.lykos.pointage.database.GeofenceDatabase
+import com.lykos.pointage.data.database.GeofenceDatabase
 
 /**
  * Application class for initializing app-wide components

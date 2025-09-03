@@ -11,9 +11,9 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.lykos.pointage.GeofenceMapApplication
-import com.lykos.pointage.database.entity.DailyInsideTime
-import com.lykos.pointage.database.entity.LocationEvent
-import com.lykos.pointage.ui.MainActivity
+import com.lykos.pointage.data.database.entity.DailyInsideTime
+import com.lykos.pointage.data.database.entity.LocationEvent
+import com.lykos.pointage.ui.view.MainActivity
 import com.lykos.pointage.utils.PreferencesManager
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat

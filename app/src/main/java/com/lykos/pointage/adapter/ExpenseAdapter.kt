@@ -8,7 +8,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.lykos.pointage.R
 import com.lykos.pointage.databinding.ItemExpenseBinding
-import com.lykos.pointage.model.*
+import com.lykos.pointage.data.model.*
 
 class ExpenseAdapter(
     private var expenses: List<ExpenseResponse>, private val onItemClick: (ExpenseResponse) -> Unit

@@ -1,4 +1,4 @@
-package com.lykos.pointage.adapter // Replace with your package name
+package com.lykos.pointage.adapter
 
 import android.net.Uri
 import android.view.LayoutInflater

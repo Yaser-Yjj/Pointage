@@ -2,32 +2,99 @@
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/coordinatorLayout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".ui.MainActivity">
+    android:layout_height="match_parent">
 
-    <!-- App Bar -->
-    <com.google.android.material.appbar.AppBarLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/geofence_stroke"
-        android:paddingVertical="10dp"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
-
-        <androidx.appcompat.widget.Toolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="@color/geofence_stroke"
-            app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
-    </com.google.android.material.appbar.AppBarLayout>
-
-    <!-- Main Content -->
     <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/coordinatorLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        tools:context=".ui.view.MainActivity">
+
+        <!-- Toolbar -->
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/appBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/geofence_stroke"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <androidx.appcompat.widget.Toolbar
+                android:id="@+id/toolbar"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="@color/geofence_stroke"
+                app:popupTheme="@style/ThemeOverlay.AppCompat.Light" />
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <!-- Status row (Timer + FAB) -->
+        <LinearLayout
+            android:id="@+id/statusRow"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:background="@color/white"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/appBar">
+
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_margin="12dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_status_banner"
+                android:gravity="center"
+                android:padding="12dp"
+                android:text="Timer 00:00"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/btnCurrentLocation"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_margin="12dp"
+                android:backgroundTint="@color/geofence_stroke"
+                android:contentDescription="Go to current location"
+                android:src="@drawable/ic_my_location" />
+        </LinearLayout>
+
+        <!-- Zone title + RecyclerView -->
+        <LinearLayout
+            android:id="@+id/zoneContainer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:background="@color/white"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="16dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/statusRow">
+
+            <TextView
+                android:id="@+id/textCurrentArea"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="Selected Zone"
+                android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerSafeZones"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipToPadding="false"
+                android:orientation="horizontal"
+                android:padding="8dp"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+        </LinearLayout>
 
         <!-- Google Map -->
         <androidx.fragment.app.FragmentContainerView
@@ -35,170 +102,64 @@
             android:name="com.google.android.gms.maps.SupportMapFragment"
             android:layout_width="0dp"
             android:layout_height="0dp"
+            app:layout_constraintBottom_toTopOf="@id/bottomBar"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/zoneContainer" />
+
+        <!-- Bottom bar with buttons -->
+        <LinearLayout
+            android:id="@+id/bottomBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/white"
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:weightSum="3"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintStart_toStartOf="parent">
 
-        <!-- Floating Button -->
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:layout_marginTop="35dp"
-            android:gravity="center"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="@+id/map">
-
-            <!-- Current Area Title -->
-            <TextView
-                android:id="@+id/textCurrentArea"
-                android:layout_width="wrap_content"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPV"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:text="Area 1"
-                android:textColor="@color/black"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:layout_weight="1"
+                android:drawableTop="@drawable/ic_pv"
+                android:drawablePadding="6dp"
+                android:padding="12dp"
+                android:text="PV"
+                android:textColor="@android:color/white"
+                app:backgroundTint="@color/geofence_stroke"
+                app:cornerRadius="16dp" />
 
-            <!-- Carousel Buttons -->
-            <LinearLayout
-                android:layout_width="match_parent"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnReportImages"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:layout_marginHorizontal="8dp"
+                android:layout_weight="1"
+                android:drawableTop="@drawable/ic_report"
+                android:drawablePadding="6dp"
+                android:padding="12dp"
+                android:text="Rapport"
+                android:textColor="@android:color/white"
+                app:backgroundTint="@color/geofence_stroke"
+                app:cornerRadius="16dp" />
 
-                <ImageButton
-                    android:id="@+id/btnPrevArea"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Previous area"
-                    android:src="@drawable/outline_arrow_left_24" />
-
-                <TextView
-                    android:id="@+id/textAreaName"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Marrakech"
-                    android:textColor="@color/black"
-                    android:textAlignment="center"
-                    android:textSize="16sp" />
-
-                <ImageButton
-                    android:id="@+id/btnNextArea"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Next area"
-                    android:src="@drawable/outline_arrow_right_24" />
-            </LinearLayout>
-
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDepend"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:drawableTop="@drawable/ic_constraint"
+                android:drawablePadding="6dp"
+                android:padding="12dp"
+                android:text="Contrainte"
+                android:textColor="@android:color/white"
+                app:backgroundTint="@color/geofence_stroke"
+                app:cornerRadius="16dp" />
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_margin="16dp"
-            android:background="@drawable/bg_status_banner"
-            android:gravity="center"
-            android:padding="12dp"
-            android:text="Timer 00:00"
-            android:textColor="@color/white"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/btnCurrentLocation"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_margin="16dp"
-            android:contentDescription="Go to current location"
-            android:backgroundTint="@color/geofence_stroke"
-            android:src="@drawable/ic_my_location"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:background="@color/white"
-            app:layout_constraintBottom_toBottomOf="parent">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:weightSum="3">
-
-                <!-- Bouton PV -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnPV"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
-                    android:text="PV"
-                    android:textColor="@android:color/white"
-                    android:drawableTop="@drawable/ic_pv"
-                    android:drawablePadding="6dp"
-                    android:padding="12dp"
-                    app:backgroundTint="@color/geofence_stroke"
-                    app:cornerRadius="16dp"
-                    app:rippleColor="#40FFFFFF"
-                    app:strokeColor="#E0E0E0"
-                    app:strokeWidth="1dp" />
-
-                <!-- Bouton Rapport & Images -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnReportImages"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    android:layout_marginEnd="4dp"
-                    android:text="Rapport"
-                    android:textColor="@android:color/white"
-                    android:drawableTop="@drawable/ic_report"
-                    android:drawablePadding="6dp"
-                    android:padding="12dp"
-                    app:backgroundTint="@color/geofence_stroke"
-                    app:cornerRadius="16dp"
-                    app:rippleColor="#40FFFFFF"
-                    app:strokeColor="#E0E0E0"
-                    app:strokeWidth="1dp" />
-
-                <!-- Bouton Contrainte -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnDepend"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    android:text="Contrainte"
-                    android:textColor="@android:color/white"
-                    android:drawableTop="@drawable/ic_constraint"
-                    android:drawablePadding="6dp"
-                    android:padding="12dp"
-                    app:backgroundTint="@color/geofence_stroke"
-                    app:cornerRadius="16dp"
-                    app:rippleColor="#40FFFFFF"
-                    app:strokeColor="#E0E0E0"
-                    app:strokeWidth="1dp" />
-
-            </LinearLayout>
-        </LinearLayout>
-
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -208,10 +169,10 @@
         android:layout_height="0dp"
         android:background="@color/white"
         android:elevation="8dp"
-        android:padding="16dp"
-        app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior">
-        <!-- Bottom Sheet Control Panel -->
-
-    </FrameLayout>
+        app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/map" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

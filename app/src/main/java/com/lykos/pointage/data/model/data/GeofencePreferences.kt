@@ -1,4 +1,4 @@
-package com.lykos.pointage.model.data
+package com.lykos.pointage.data.model.data
 
 /**
  * Data class for geofence preferences storage

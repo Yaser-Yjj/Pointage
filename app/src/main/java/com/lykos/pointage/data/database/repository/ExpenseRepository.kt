@@ -1,8 +1,8 @@
-package com.lykos.pointage.database.repository
+package com.lykos.pointage.data.database.repository
 
 import android.content.Context
 import android.net.Uri
-import com.lykos.pointage.model.*
+import com.lykos.pointage.data.model.*
 import com.lykos.pointage.service.RetrofitClient
 import com.lykos.pointage.utils.FileUtils
 import kotlinx.coroutines.Dispatchers

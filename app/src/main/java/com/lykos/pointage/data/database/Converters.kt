@@ -1,4 +1,4 @@
-package com.lykos.pointage.database
+package com.lykos.pointage.data.database
 
 import androidx.room.TypeConverter
 import java.util.Date

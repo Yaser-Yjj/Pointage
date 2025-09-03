@@ -1,4 +1,4 @@
-package com.lykos.pointage.model
+package com.lykos.pointage.data.model
 
 import com.google.gson.annotations.SerializedName
 

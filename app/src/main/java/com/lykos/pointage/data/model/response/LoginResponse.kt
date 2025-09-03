@@ -1,4 +1,4 @@
-package com.lykos.pointage.model.response
+package com.lykos.pointage.data.model.response
 
 import com.google.gson.annotations.SerializedName
 

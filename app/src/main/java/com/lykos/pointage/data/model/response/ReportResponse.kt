@@ -1,6 +1,6 @@
-package com.lykos.pointage.model.response
+package com.lykos.pointage.data.model.response
 
-import com.lykos.pointage.model.data.ReportData
+import com.lykos.pointage.data.model.data.ReportData
 
 data class ReportResponse(
     val success: Boolean,

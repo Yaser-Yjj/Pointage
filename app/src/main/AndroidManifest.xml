@@ -38,7 +38,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Pointage">
         <activity
-            android:name=".ui.SignInActivity"
+            android:name=".ui.view.SignInActivity"
             android:exported="true" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -46,7 +46,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter></activity>
         <activity
-            android:name=".ui.PvReportActivity"
+            android:name=".ui.view.PvReportActivity"
             android:exported="false" />
 
         <provider
@@ -60,21 +60,21 @@
         </provider>
 
         <activity
-            android:name=".ui.ImageUploadActivity"
+            android:name=".ui.view.ImageUploadActivity"
             android:exported="false" />
 
         <activity
-            android:name=".ui.ExpensesActivity"
+            android:name=".ui.view.ExpensesActivity"
             android:exported="false" />
         <activity
-            android:name=".ui.DailyReportActivity"
+            android:name=".ui.view.DailyReportActivity"
             android:exported="false" /> <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
 
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".ui.view.MainActivity"
             android:exported="true"/>
         <service
             android:name=".service.LocationTrackingService"

@@ -1,0 +1,36 @@
+<!-- res/layout/item_safe_zone.xml -->
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="4dp"
+    android:layout_gravity="center"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="2dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/textZoneName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Zone 1"
+            android:textStyle="bold"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/textZoneDetails"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Lat: 0.00, Lng: 0.00 | Radius: 50m"
+            android:textSize="12sp"
+            android:textColor="#666666" />
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

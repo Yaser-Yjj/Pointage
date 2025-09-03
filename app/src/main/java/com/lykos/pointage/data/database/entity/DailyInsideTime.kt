@@ -1,4 +1,4 @@
-package com.lykos.pointage.database.entity
+package com.lykos.pointage.data.database.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
