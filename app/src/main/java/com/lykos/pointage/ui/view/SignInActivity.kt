@@ -1,4 +1,4 @@
-package com.lykos.pointage.ui
+package com.lykos.pointage.ui.view
 
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -12,12 +12,11 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.lykos.pointage.R
-import com.lykos.pointage.model.data.LoginData
+import com.lykos.pointage.data.model.data.LoginData
 import com.lykos.pointage.service.RetrofitClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.core.content.edit
 import com.lykos.pointage.utils.PreferencesManager
 
 class SignInActivity : AppCompatActivity() {

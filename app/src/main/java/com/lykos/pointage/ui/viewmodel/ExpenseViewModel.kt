@@ -1,4 +1,4 @@
-package com.lykos.pointage.viewmodel
+package com.lykos.pointage.ui.viewmodel
 
 import android.app.Application
 import android.net.Uri
@@ -7,8 +7,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.lykos.pointage.database.repository.ExpenseRepository
-import com.lykos.pointage.model.*
+import com.lykos.pointage.data.database.repository.ExpenseRepository
+import com.lykos.pointage.data.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

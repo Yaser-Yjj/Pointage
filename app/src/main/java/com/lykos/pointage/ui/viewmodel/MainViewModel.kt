@@ -1,17 +1,15 @@
-package com.lykos.pointage.viewmodel
+package com.lykos.pointage.ui.viewmodel
 
 import android.app.Application
-import android.content.ContentValues.TAG
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.lykos.pointage.GeofenceMapApplication
-import com.lykos.pointage.database.entity.LocationEvent
-import com.lykos.pointage.model.data.GeofencePreferences
-import com.lykos.pointage.model.data.SafeZoneData
+import com.lykos.pointage.data.database.entity.LocationEvent
+import com.lykos.pointage.data.model.data.GeofencePreferences
+import com.lykos.pointage.data.model.data.SafeZoneData
 import com.lykos.pointage.utils.PreferencesManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted

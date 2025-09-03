@@ -1,4 +1,4 @@
-package com.lykos.pointage.ui
+package com.lykos.pointage.ui.view
 
 import android.content.Intent
 import android.os.Bundle
@@ -10,7 +10,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.lykos.pointage.R
 import com.lykos.pointage.service.RetrofitClient
-import com.lykos.pointage.utils.GeofenceManager
 import com.lykos.pointage.utils.PreferencesManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

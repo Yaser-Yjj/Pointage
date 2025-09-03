@@ -1,4 +1,4 @@
-package com.lykos.pointage.ui
+package com.lykos.pointage.ui.view
 
 import android.Manifest
 import android.content.Intent

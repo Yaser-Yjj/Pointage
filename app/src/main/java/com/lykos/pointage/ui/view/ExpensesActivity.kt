@@ -1,4 +1,4 @@
-package com.lykos.pointage.ui
+package com.lykos.pointage.ui.view
 
 import android.Manifest
 import android.content.Intent
@@ -17,9 +17,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.lykos.pointage.data.model.ExpenseItemRequest
 import com.lykos.pointage.databinding.ActivityExpensesBinding
-import com.lykos.pointage.model.ExpenseItemRequest
-import com.lykos.pointage.viewmodel.ExpenseViewModel
+import com.lykos.pointage.ui.viewmodel.ExpenseViewModel
 import java.io.File
 import java.io.FileOutputStream
 
